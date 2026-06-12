@@ -1,0 +1,223 @@
+datasource db {
+  provider = "mysql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Organization {
+  id                 String              @id @default(uuid())
+  name               String
+  sites              Site[]
+  users              Membership[]
+  assets             Asset[]
+  incidents          Incident[]
+  checklistTemplates ChecklistTemplate[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+}
+
+model Site {
+  id             String       @id @default(uuid())
+  name           String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  zones          Zone[]
+  assets         Asset[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Zone {
+  id        String   @id @default(uuid())
+  name      String
+  siteId    String
+  site      Site     @relation(fields: [siteId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  name         String
+  passwordHash String
+  memberships  Membership[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Role {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  memberships Membership[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Membership {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  roleId         String
+  role           Role         @relation(fields: [roleId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([userId, organizationId])
+}
+
+model AssetType {
+  id        String   @id @default(uuid())
+  name      String
+  assets    Asset[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Asset {
+  id             String         @id @default(uuid())
+  name           String
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  siteId         String
+  site           Site           @relation(fields: [siteId], references: [id])
+  assetTypeId    String
+  assetType      AssetType      @relation(fields: [assetTypeId], references: [id])
+  checklistRuns  ChecklistRun[]
+  incidents      Incident[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model ChecklistTemplate {
+  id             String                @id @default(uuid())
+  name           String
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id])
+  assignments    ChecklistAssignment[]
+  runs           ChecklistRun[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+}
+
+model ChecklistAssignment {
+  id         String            @id @default(uuid())
+  templateId String
+  template   ChecklistTemplate @relation(fields: [templateId], references: [id])
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+}
+
+model ChecklistRun {
+  id         String              @id @default(uuid())
+  templateId String
+  template   ChecklistTemplate   @relation(fields: [templateId], references: [id])
+  assetId    String?
+  asset      Asset?              @relation(fields: [assetId], references: [id])
+  responses  ChecklistResponse[]
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+}
+
+model ChecklistResponse {
+  id         String       @id @default(uuid())
+  runId      String
+  run        ChecklistRun @relation(fields: [runId], references: [id])
+  questionId String
+  value      String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Incident {
+  id             String       @id @default(uuid())
+  title          String
+  description    String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  assetId        String?
+  asset          Asset?       @relation(fields: [assetId], references: [id])
+  actionItems    ActionItem[]
+  attachments    Attachment[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model ActionItem {
+  id         String    @id @default(uuid())
+  title      String
+  incidentId String
+  incident   Incident  @relation(fields: [incidentId], references: [id])
+  comments   Comment[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Comment {
+  id           String     @id @default(uuid())
+  content      String
+  actionItemId String
+  actionItem   ActionItem @relation(fields: [actionItemId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Attachment {
+  id         String    @id @default(uuid())
+  url        String
+  incidentId String?
+  incident   Incident? @relation(fields: [incidentId], references: [id])
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  message   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  actorId   String
+  entity    String
+  entityId  String
+  oldState  Json?
+  newState  Json?
+  createdAt DateTime @default(now())
+}
+
+model SyncOperation {
+  id        String   @id @default(uuid())
+  entity    String
+  operation String
+  payload   Json
+  createdAt DateTime @default(now())
+}
+
+model PolicyRule {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SeverityMatrix {
+  id        String   @id @default(uuid())
+  level     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
