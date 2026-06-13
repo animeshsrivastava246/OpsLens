@@ -6,7 +6,8 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun --watch src/index.ts",
-    "test:auth": "bun run src/test-auth.ts"
+    "test:auth": "bun run src/test-auth.ts",
+    "test:registry": "bun run src/test-registry.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",

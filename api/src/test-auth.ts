@@ -1,27 +1,8 @@
 import 'dotenv/config';
+import { get, post } from './test-helpers';
 
 async function runTests() {
   console.log("=== STARTING AUTH & TENANCY VERIFICATION TESTS ===");
-
-  const baseUrl = 'http://localhost:3000';
-
-  // Helper for requests
-  const post = async (path: string, body: any) => {
-    const res = await fetch(`${baseUrl}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    return { status: res.status, data: (await res.json()) as any };
-  };
-
-  const get = async (path: string, token?: string) => {
-    const res = await fetch(`${baseUrl}${path}`, {
-      method: 'GET',
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-    });
-    return { status: res.status, data: (await res.json()) as any };
-  };
 
   let workerToken = '';
   let adminToken = '';

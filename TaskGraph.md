@@ -46,13 +46,13 @@ Req: [x] Setup role access controls.
 Pass: [x] System blocks cross-tenant requests.
 Pass: [x] Auth flow issues JWTs.
 
-### Stage 1.3: Core Registry
+### Stage 1.3: Core Registry [COMPLETED]
 Tech: MySQL schema, React Native.
-Req: Build CRUD REST endpoints.
-Req: Implement QR code scanner.
-Req: Build asset resolution API.
-Pass: Scanner loads localized asset.
-Pass: Assets resolve via API.
+Req: [x] Build CRUD REST endpoints.
+Req: [x] Implement QR code scanner.
+Req: [x] Build asset resolution API.
+Pass: [x] Scanner loads localized asset.
+Pass: [x] Assets resolve via API.
 
 ### Stage 1.4: Base Sync Layer
 Tech: expo-sqlite, expo-file-system APIs.

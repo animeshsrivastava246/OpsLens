@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import tenantMiddleware from './middleware/tenant.middleware';
 import authRouter from './routes/auth.routes';
+import assetRouter from './routes/asset.routes';
 import { authMiddleware, requireRole } from './middleware/auth.middleware';
 import prisma from './db';
 
@@ -22,6 +23,7 @@ app.get('/health', (req, res) => {
 
 // Register authentication router
 app.use('/', authRouter);
+app.use('/', assetRouter);
 
 // Verification test route for tenant isolation
 app.get('/test/tenant-isolation', authMiddleware as any, async (req: any, res) => {
