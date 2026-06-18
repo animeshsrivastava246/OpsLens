@@ -8,36 +8,63 @@ import type { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const router = Router();
 
+class HttpError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function verifyUserAndCredentials(email: string, password: string) {
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (!user) {
+    throw new HttpError(401, 'Invalid email or password');
+  }
+
+  const isPasswordValid = bcrypt.compareSync(password, user.passwordHash);
+  if (!isPasswordValid) {
+    throw new HttpError(401, 'Invalid email or password');
+  }
+
+  return user;
+}
+
+function checkAuthParams(email: any, password: any) {
+  if (!email) {
+    throw new HttpError(400, 'Email and password are required');
+  }
+  if (!password) {
+    throw new HttpError(400, 'Email and password are required');
+  }
+}
+
+function buildMembershipWhere(userId: string, organizationId?: string) {
+  const where: any = { userId };
+  if (organizationId) {
+    where.organizationId = organizationId;
+  }
+  return where;
+}
+
+function getErrorStatus(err: any): number {
+  return err.status || 500;
+}
+
 // POST /auth/login
 router.post('/auth/login', async (req, res) => {
   const { email, password, organizationId } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
-  }
-
   try {
-    // Find user
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-
-    // Verify password
-    const isPasswordValid = bcrypt.compareSync(password, user.passwordHash);
-    if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
+    checkAuthParams(email, password);
+    const user = await verifyUserAndCredentials(email, password);
 
     // Resolve membership
     const membership = await prisma.membership.findFirst({
-      where: {
-        userId: user.id,
-        ...(organizationId ? { organizationId } : {}),
-      },
+      where: buildMembershipWhere(user.id, organizationId),
       include: {
         role: true,
         organization: true,
@@ -45,7 +72,7 @@ router.post('/auth/login', async (req, res) => {
     });
 
     if (!membership) {
-      return res.status(403).json({ error: 'User is not a member of the specified organization' });
+      throw new HttpError(403, 'User is not a member of the specified organization');
     }
 
     // Generate JWT token
@@ -74,43 +101,56 @@ router.post('/auth/login', async (req, res) => {
       },
     });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    return res.status(getErrorStatus(err)).json({ error: err.message });
   }
 });
+
+async function verifyRefreshMembership(userId: string, organizationId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new HttpError(401, 'User no longer exists');
+  }
+
+  const membership = await prisma.membership.findFirst({
+    where: {
+      userId: user.id,
+      organizationId,
+    },
+    include: {
+      role: true,
+    },
+  });
+
+  if (!membership) {
+    throw new HttpError(403, 'User is no longer a member of the organization');
+  }
+
+  return { user, membership };
+}
+
+async function verifyRefreshToken(token: string) {
+  const decoded = jwt.verify(token, JWT_SECRET, { ignoreExpiration: true }) as any;
+  return verifyRefreshMembership(decoded.userId, decoded.organizationId);
+}
+
+function handleRefreshError(err: any, res: Response) {
+  const status = err.status || 401;
+  const msg = err.status ? err.message : 'Invalid token';
+  return res.status(status).json({ error: msg });
+}
 
 // POST /auth/refresh
 router.post('/auth/refresh', async (req, res) => {
   const { token } = req.body;
 
-  if (!token) {
-    return res.status(400).json({ error: 'Token is required' });
-  }
-
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, { ignoreExpiration: true }) as any;
-    
-    // Check if user still exists and has valid membership
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: 'User no longer exists' });
+    if (!token) {
+      throw new HttpError(400, 'Token is required');
     }
-
-    const membership = await prisma.membership.findFirst({
-      where: {
-        userId: user.id,
-        organizationId: decoded.organizationId,
-      },
-      include: {
-        role: true,
-      },
-    });
-
-    if (!membership) {
-      return res.status(403).json({ error: 'User is no longer a member of the organization' });
-    }
+    const { user, membership } = await verifyRefreshToken(token);
 
     // Issue new token
     const newToken = jwt.sign(
@@ -125,8 +165,8 @@ router.post('/auth/refresh', async (req, res) => {
     );
 
     return res.json({ token: newToken });
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
+  } catch (err: any) {
+    return handleRefreshError(err, res);
   }
 });
 

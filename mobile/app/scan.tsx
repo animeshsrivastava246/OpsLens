@@ -22,16 +22,18 @@ function useScannerState() {
     await resolveCode(data);
   };
 
-  // fallow-ignore-next-line complexity
   const resolveCode = async (code: string) => {
-    if (!code || code.trim() === '') return;
+    const trimmed = code.trim();
+    if (!trimmed) {
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const asset = await api.get(`/assets/scan/${code.trim()}`);
+      const asset = await api.get(`/assets/scan/${trimmed}`);
       router.replace(`/asset/${asset.id}`);
     } catch (err: any) {
-      setError(err.message || 'Failed to resolve asset.');
+      setError(err.message);
       setScanned(false);
     } finally {
       setLoading(false);
@@ -113,44 +115,65 @@ interface CameraViewfinderProps {
   onRequestPermission: () => void;
 }
 
-// fallow-ignore-next-line complexity
+interface CameraGrantedViewProps {
+  loading: boolean;
+  onBarcodeScanned: (event: { data: string }) => void;
+}
+
+function LoaderOverlay({ show }: { show: boolean }) {
+  if (!show) {
+    return null;
+  }
+  return <ActivityIndicator size="large" color="#ffffff" style={styles.camLoader} />;
+}
+
+function CameraGrantedView({ loading, onBarcodeScanned }: CameraGrantedViewProps) {
+  return (
+    <CameraView
+      style={StyleSheet.absoluteFill}
+      facing="back"
+      onBarcodeScanned={onBarcodeScanned}
+      barcodeScannerSettings={{
+        barcodeTypes: ['qr'],
+      }}
+    >
+      <View style={styles.overlay}>
+        <View style={styles.unfocusedContainer}></View>
+        <View style={styles.middleContainer}>
+          <View style={styles.unfocusedContainer}></View>
+          <View style={styles.viewfinder}>
+            <View style={[styles.corner, styles.topLeft]} />
+            <View style={[styles.corner, styles.topRight]} />
+            <View style={[styles.corner, styles.bottomLeft]} />
+            <View style={[styles.corner, styles.bottomRight]} />
+            <LoaderOverlay show={loading} />
+          </View>
+          <View style={styles.unfocusedContainer}></View>
+        </View>
+        <View style={styles.unfocusedContainer}></View>
+      </View>
+    </CameraView>
+  );
+}
+
+function PermissionBlockedView({ onRequestPermission }: { onRequestPermission: () => void }) {
+  return (
+    <View style={styles.permissionBlocked}>
+      <Text style={styles.permissionText}>Camera access was denied or is unavailable.</Text>
+      <Pressable style={styles.permissionBtn} onPress={onRequestPermission}>
+        <Text style={styles.permissionBtnText}>Request Permission</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function CameraViewfinder({ permission, loading, onBarcodeScanned, onRequestPermission }: CameraViewfinderProps) {
   return (
     <View style={styles.scannerContainer}>
       {permission.granted ? (
-        <CameraView
-          style={StyleSheet.absoluteFill}
-          facing="back"
-          onBarcodeScanned={onBarcodeScanned}
-          barcodeScannerSettings={{
-            barcodeTypes: ['qr'],
-          }}
-        >
-          <View style={styles.overlay}>
-            <View style={styles.unfocusedContainer}></View>
-            <View style={styles.middleContainer}>
-              <View style={styles.unfocusedContainer}></View>
-              <View style={styles.viewfinder}>
-                <View style={[styles.corner, styles.topLeft]} />
-                <View style={[styles.corner, styles.topRight]} />
-                <View style={[styles.corner, styles.bottomLeft]} />
-                <View style={[styles.corner, styles.bottomRight]} />
-                {loading && (
-                  <ActivityIndicator size="large" color="#ffffff" style={styles.camLoader} />
-                )}
-              </View>
-              <View style={styles.unfocusedContainer}></View>
-            </View>
-            <View style={styles.unfocusedContainer}></View>
-          </View>
-        </CameraView>
+        <CameraGrantedView loading={loading} onBarcodeScanned={onBarcodeScanned} />
       ) : (
-        <View style={styles.permissionBlocked}>
-          <Text style={styles.permissionText}>Camera access was denied or is unavailable.</Text>
-          <Pressable style={styles.permissionBtn} onPress={onRequestPermission}>
-            <Text style={styles.permissionBtnText}>Request Permission</Text>
-          </Pressable>
-        </View>
+        <PermissionBlockedView onRequestPermission={onRequestPermission} />
       )}
     </View>
   );
@@ -164,7 +187,52 @@ interface ManualInputFallbackProps {
   onResolve: () => void;
 }
 
-// fallow-ignore-next-line complexity
+function ErrorMessage({ text }: { text: string | null }) {
+  if (!text) {
+    return null;
+  }
+  return <Text style={styles.errorText}>⚠️ {text}</Text>;
+}
+
+function ResolveButtonContent({ loading }: { loading: boolean }) {
+  if (loading) {
+    return <ActivityIndicator size="small" color="#ffffff" />;
+  }
+  return <Text style={styles.resolveBtnText}>Resolve Asset Context</Text>;
+}
+
+interface ResolveButtonProps {
+  manualCode: string;
+  loading: boolean;
+  onPress: () => void;
+}
+
+function ResolveButton({ manualCode, loading, onPress }: ResolveButtonProps) {
+  const isInputEmpty = !manualCode.trim();
+  const isDisabled = isInputEmpty || loading;
+
+  const getButtonStyle = ({ pressed }: { pressed: boolean }) => {
+    const list: any[] = [styles.resolveBtn];
+    if (pressed) {
+      list.push(styles.resolveBtnPressed);
+    }
+    if (isDisabled) {
+      list.push(styles.resolveBtnDisabled);
+    }
+    return list;
+  };
+
+  return (
+    <Pressable
+      style={getButtonStyle}
+      onPress={onPress}
+      disabled={isDisabled}
+    >
+      <ResolveButtonContent loading={loading} />
+    </Pressable>
+  );
+}
+
 function ManualInputFallback({ manualCode, loading, error, onCodeChange, onResolve }: ManualInputFallbackProps) {
   return (
     <View style={styles.manualInputCard}>
@@ -183,23 +251,9 @@ function ManualInputFallback({ manualCode, loading, error, onCodeChange, onResol
         autoCorrect={false}
       />
 
-      {error && <Text style={styles.errorText}>⚠️ {error}</Text>}
+      <ErrorMessage text={error} />
 
-      <Pressable
-        style={({ pressed }) => [
-          styles.resolveBtn,
-          pressed && styles.resolveBtnPressed,
-          (!manualCode.trim() || loading) && styles.resolveBtnDisabled,
-        ]}
-        onPress={onResolve}
-        disabled={!manualCode.trim() || loading}
-      >
-        {loading ? (
-          <ActivityIndicator size="small" color="#ffffff" />
-        ) : (
-          <Text style={styles.resolveBtnText}>Resolve Asset Context</Text>
-        )}
-      </Pressable>
+      <ResolveButton manualCode={manualCode} loading={loading} onPress={onResolve} />
     </View>
   );
 }

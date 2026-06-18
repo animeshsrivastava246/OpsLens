@@ -1,14 +1,7 @@
 import 'dotenv/config';
 import { get, post } from './test-helpers';
 
-async function runTests() {
-  console.log("=== STARTING AUTH & TENANCY VERIFICATION TESTS ===");
-
-  let workerToken = '';
-  let adminToken = '';
-  let healthWorkerToken = '';
-
-  // Test 1: Invalid Login
+async function testInvalidLogin(): Promise<void> {
   console.log("\nTest 1: Login with invalid password...");
   const invalidLogin = await post('/auth/login', {
     email: 'worker@acme.com',
@@ -19,44 +12,52 @@ async function runTests() {
   } else {
     console.error("❌ Fail: Expected status 401, got:", invalidLogin.status);
   }
+}
 
-  // Test 2: Successful Login (Worker)
+async function testWorkerLogin(): Promise<string> {
   console.log("\nTest 2: Login as Acme Field Worker...");
   const workerLogin = await post('/auth/login', {
     email: 'worker@acme.com',
     password: 'worker123',
   });
   if (workerLogin.status === 200 && workerLogin.data.token) {
-    workerToken = workerLogin.data.token;
     console.log("✅ Success: Login successful. JWT token issued.");
     console.log(`   User: ${workerLogin.data.user.name}, Role: ${workerLogin.data.user.role}, Org: ${workerLogin.data.user.organization.name}`);
-  } else {
-    console.error("❌ Fail: Login failed. Data:", workerLogin.data);
+    return workerLogin.data.token;
   }
+  console.error("❌ Fail: Login failed. Data:", workerLogin.data);
+  process.exit(1);
+}
 
-  // Test 3: Successful Login (Admin)
+async function testAdminLogin(): Promise<string> {
   console.log("\nTest 3: Login as Acme Admin...");
   const adminLogin = await post('/auth/login', {
     email: 'admin@acme.com',
     password: 'admin123',
   });
   if (adminLogin.status === 200 && adminLogin.data.token) {
-    adminToken = adminLogin.data.token;
     console.log("✅ Success: Admin login successful.");
+    return adminLogin.data.token;
   }
+  console.error("❌ Fail: Admin Login failed. Data:", adminLogin.data);
+  process.exit(1);
+}
 
-  // Test 4: Successful Login (Global Health Worker)
+async function testHealthWorkerLogin(): Promise<string> {
   console.log("\nTest 4: Login as Global Health Worker...");
   const healthWorkerLogin = await post('/auth/login', {
     email: 'worker@globalhealth.com',
     password: 'worker123',
   });
   if (healthWorkerLogin.status === 200 && healthWorkerLogin.data.token) {
-    healthWorkerToken = healthWorkerLogin.data.token;
     console.log("✅ Success: Global Health Worker login successful.");
+    return healthWorkerLogin.data.token;
   }
+  console.error("❌ Fail: Global Health Worker Login failed. Data:", healthWorkerLogin.data);
+  process.exit(1);
+}
 
-  // Test 5: Verify /me profile
+async function testProfile(workerToken: string): Promise<void> {
   console.log("\nTest 5: Retrieve user profile /me...");
   const profile = await get('/me', workerToken);
   if (profile.status === 200 && profile.data.user.email === 'worker@acme.com') {
@@ -64,8 +65,9 @@ async function runTests() {
   } else {
     console.error("❌ Fail: Profile check failed. Data:", profile.data);
   }
+}
 
-  // Test 6: Verify Tenant Isolation (Acme Worker)
+async function testAcmeAssets(workerToken: string): Promise<void> {
   console.log("\nTest 6: Retrieve assets as Acme Worker (should see Acme assets)...");
   const acmeAssets = await get('/test/tenant-isolation', workerToken);
   if (acmeAssets.status === 200) {
@@ -74,8 +76,9 @@ async function runTests() {
   } else {
     console.error("❌ Fail: Failed to fetch assets. Data:", acmeAssets.data);
   }
+}
 
-  // Test 7: Verify Tenant Isolation (Global Health Worker - should NOT see Acme assets)
+async function testHealthAssets(healthWorkerToken: string): Promise<void> {
   console.log("\nTest 7: Retrieve assets as Global Health Worker (should see 0 assets)...");
   const healthAssets = await get('/test/tenant-isolation', healthWorkerToken);
   if (healthAssets.status === 200 && healthAssets.data.assetsCount === 0) {
@@ -83,8 +86,9 @@ async function runTests() {
   } else {
     console.error("❌ Fail: Tenant isolation failed. Global Health worker retrieved assets:", healthAssets.data);
   }
+}
 
-  // Test 8: Verify Role Guards (Admin route - should allow Admin)
+async function testAdminAccess(adminToken: string): Promise<void> {
   console.log("\nTest 8: Access admin-only route as Admin...");
   const adminAccess = await get('/test/admin-only', adminToken);
   if (adminAccess.status === 200) {
@@ -92,8 +96,9 @@ async function runTests() {
   } else {
     console.error("❌ Fail: Access denied for Admin. Data:", adminAccess.data);
   }
+}
 
-  // Test 9: Verify Role Guards (Admin route - should block Worker)
+async function testWorkerAccess(workerToken: string): Promise<void> {
   console.log("\nTest 9: Access admin-only route as Worker (should block)...");
   const workerAccess = await get('/test/admin-only', workerToken);
   if (workerAccess.status === 403) {
@@ -101,6 +106,21 @@ async function runTests() {
   } else {
     console.error("❌ Fail: Expected status 403, got:", workerAccess.status);
   }
+}
+
+async function runTests() {
+  console.log("=== STARTING AUTH & TENANCY VERIFICATION TESTS ===");
+
+  await testInvalidLogin();
+  const workerToken = await testWorkerLogin();
+  const adminToken = await testAdminLogin();
+  const healthWorkerToken = await testHealthWorkerLogin();
+
+  await testProfile(workerToken);
+  await testAcmeAssets(workerToken);
+  await testHealthAssets(healthWorkerToken);
+  await testAdminAccess(adminToken);
+  await testWorkerAccess(workerToken);
 
   console.log("\n=== VERIFICATION COMPLETED ===");
 }

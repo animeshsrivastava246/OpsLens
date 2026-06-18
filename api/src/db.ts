@@ -25,63 +25,56 @@ const adapter = new PrismaMariaDb({
 
 const basePrisma = new PrismaClient({ adapter });
 
+function applyFilterToWhere(model: string, a: any, tenantId: string, tenantModels: string[]) {
+  if (tenantModels.includes(model)) {
+    a.where = {
+      ...a.where,
+      organizationId: tenantId,
+    };
+  } else if (model === 'Organization') {
+    a.where = {
+      ...a.where,
+      id: tenantId,
+    };
+  }
+}
+
+function applyWriteFilter(model: string, a: any, tenantId: string, tenantModels: string[]) {
+  if (!tenantModels.includes(model) || !a.data) {
+    return;
+  }
+  if (Array.isArray(a.data)) {
+    a.data = a.data.map((item: any) => ({
+      ...item,
+      organizationId: tenantId,
+    }));
+  } else {
+    a.data.organizationId = tenantId;
+  }
+}
+
+const filterOps = new Set(['findFirst', 'findMany', 'findUnique', 'count', 'aggregate', 'groupBy', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany']);
+const writeOps = new Set(['create', 'createMany']);
+
+function getTenantId(context: TenantContext | undefined): string | undefined {
+  if (!context) return undefined;
+  return context.organizationId;
+}
+
 // Create the tenant-aware Prisma extension
 export const prisma = basePrisma.$extends({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
-        const context = tenantStorage.getStore();
-        const tenantId = context?.organizationId;
-
-        // Models that should be isolated by organizationId
+        const tenantId = getTenantId(tenantStorage.getStore());
         const tenantModels = ['Site', 'Asset', 'ChecklistTemplate', 'Membership', 'Incident'];
 
         if (tenantId) {
           const a = args as any;
-
-          // Apply RLS filter to read operations
-          if (['findFirst', 'findMany', 'findUnique', 'count', 'aggregate', 'groupBy'].includes(operation)) {
-            if (tenantModels.includes(model)) {
-              a.where = {
-                ...a.where,
-                organizationId: tenantId,
-              };
-            } else if (model === 'Organization') {
-              a.where = {
-                ...a.where,
-                id: tenantId,
-              };
-            }
-          }
-
-          // Apply RLS filter/set tenant on write operations
-          if (['create', 'createMany'].includes(operation)) {
-            if (tenantModels.includes(model)) {
-              if (a.data) {
-                if (Array.isArray(a.data)) {
-                  a.data = a.data.map((item: any) => ({
-                    ...item,
-                    organizationId: tenantId,
-                  }));
-                } else {
-                  a.data.organizationId = tenantId;
-                }
-              }
-            }
-          }
-
-          if (['update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(operation)) {
-            if (tenantModels.includes(model)) {
-              a.where = {
-                ...a.where,
-                organizationId: tenantId,
-              };
-            } else if (model === 'Organization') {
-              a.where = {
-                ...a.where,
-                id: tenantId,
-              };
-            }
+          if (filterOps.has(operation)) {
+            applyFilterToWhere(model, a, tenantId, tenantModels);
+          } else if (writeOps.has(operation)) {
+            applyWriteFilter(model, a, tenantId, tenantModels);
           }
         }
 

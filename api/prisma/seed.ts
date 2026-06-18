@@ -1,20 +1,7 @@
-import { PrismaClient } from '@prisma/client';
-import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import bcrypt from 'bcryptjs';
+import prisma from '../src/db';
 
-const adapter = new PrismaMariaDb({
-  host: '127.0.0.1',
-  port: 3307,
-  user: 'root',
-  password: 'root',
-  database: 'opslens',
-});
-const prisma = new PrismaClient({ adapter });
-
-async function main() {
-  console.log('Start seeding...');
-
-  // 1. Seed Roles
+async function seedRoles(): Promise<Record<string, string>> {
   const roles = [
     { name: 'site-admin' },
     { name: 'compliance-manager' },
@@ -33,13 +20,13 @@ async function main() {
     console.log(`Upserted role: ${dbRole.name}`);
   }
 
-  // Helper map for roles
-  const roleMap = dbRoles.reduce((acc, r) => {
+  return dbRoles.reduce((acc, r) => {
     acc[r.name] = r.id;
     return acc;
   }, {} as Record<string, string>);
+}
 
-  // 2. Seed Organizations
+async function seedOrganizations() {
   const acmeOrg = await prisma.organization.create({
     data: { name: 'Acme Industrial' },
   });
@@ -47,43 +34,45 @@ async function main() {
     data: { name: 'Global Health' },
   });
   console.log(`Created organizations: ${acmeOrg.name}, ${globalHealthOrg.name}`);
+  return { acmeOrg, globalHealthOrg };
+}
 
-  // 3. Seed Users & Memberships
+async function seedUsers(roleMap: Record<string, string>, acmeOrgId: string, globalHealthOrgId: string) {
   const users = [
     {
       email: 'admin@acme.com',
       name: 'Alice Admin',
       password: 'admin123',
       role: 'site-admin',
-      orgId: acmeOrg.id,
+      orgId: acmeOrgId,
     },
     {
       email: 'compliance@acme.com',
       name: 'Charlie Compliance',
       password: 'compliance123',
       role: 'compliance-manager',
-      orgId: acmeOrg.id,
+      orgId: acmeOrgId,
     },
     {
       email: 'supervisor@acme.com',
       name: 'Sam Supervisor',
       password: 'supervisor123',
       role: 'supervisor',
-      orgId: acmeOrg.id,
+      orgId: acmeOrgId,
     },
     {
       email: 'worker@acme.com',
       name: 'Wendy Worker',
       password: 'worker123',
       role: 'field-worker',
-      orgId: acmeOrg.id,
+      orgId: acmeOrgId,
     },
     {
       email: 'worker@globalhealth.com',
       name: 'Gavin Worker',
       password: 'worker123',
       role: 'field-worker',
-      orgId: globalHealthOrg.id,
+      orgId: globalHealthOrgId,
     },
   ];
 
@@ -118,12 +107,13 @@ async function main() {
 
     console.log(`Seeded user ${user.email} in Org with role ${u.role}`);
   }
+}
 
-  // 4. Seed basic assets for ACM (to help Phase 1.3 / 1.4)
+async function seedAssets(acmeOrgId: string) {
   const acmeSite = await prisma.site.create({
     data: {
       name: 'Acme Factory Floor A',
-      organizationId: acmeOrg.id,
+      organizationId: acmeOrgId,
     },
   });
 
@@ -136,13 +126,23 @@ async function main() {
   const mainGenerator = await prisma.asset.create({
     data: {
       name: 'Main Backup Generator 01',
-      organizationId: acmeOrg.id,
+      organizationId: acmeOrgId,
       siteId: acmeSite.id,
       assetTypeId: generatorAssetType.id,
     },
   });
 
   console.log(`Seeded Site: ${acmeSite.name}, Asset: ${mainGenerator.name}`);
+}
+
+async function main() {
+  console.log('Start seeding...');
+
+  const roleMap = await seedRoles();
+  const { acmeOrg, globalHealthOrg } = await seedOrganizations();
+  await seedUsers(roleMap, acmeOrg.id, globalHealthOrg.id);
+  await seedAssets(acmeOrg.id);
+
   console.log('Seeding finished.');
 }
 

@@ -54,13 +54,13 @@ Req: [x] Build asset resolution API.
 Pass: [x] Scanner loads localized asset.
 Pass: [x] Assets resolve via API.
 
-### Stage 1.4: Base Sync Layer
+### Stage 1.4: Base Sync Layer [COMPLETED]
 Tech: expo-sqlite, expo-file-system APIs.
-Req: Setup local SQLite schema.
-Req: Implement offline mutation queue.
-Req: Write idempotent reconciliation endpoints.
-Pass: App operates without network.
-Pass: Queues flush upon reconnection.
+Req: [x] Setup local SQLite schema.
+Req: [x] Implement offline mutation queue.
+Req: [x] Write idempotent reconciliation endpoints.
+Pass: [x] App operates without network.
+Pass: [x] Queues flush upon reconnection.
 
 ## Phase 2: Workflow Operations
 

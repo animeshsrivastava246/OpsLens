@@ -15,8 +15,10 @@ export interface AuthenticatedRequest extends Request {
 
 export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Authentication token required' });
+  }
+  const token = authHeader.split(' ')[1];
   if (!token) {
     return res.status(401).json({ error: 'Authentication token required' });
   }
@@ -32,12 +34,10 @@ export function authMiddleware(req: AuthenticatedRequest, res: Response, next: N
     req.user = decoded;
 
     // Update the tenant context in store
-    const store = tenantStorage.getStore();
-    if (store) {
-      store.organizationId = decoded.organizationId;
-      store.userId = decoded.userId;
-      store.role = decoded.role;
-    }
+    const store = tenantStorage.getStore()!;
+    store.organizationId = decoded.organizationId;
+    store.userId = decoded.userId;
+    store.role = decoded.role;
 
     next();
   } catch (err) {

@@ -14,6 +14,7 @@ OpsLens/
 ├── api/                  # Express API Server and Prisma ORM persistence layer
 ├── mobile/               # React Native Client (Expo SDK 56)
 ├── db_data/              # Local MySQL persistent storage volume (git-ignored)
+├── start.sh              # Orchestrator script to start all services (DB, API, Mobile)
 ├── OpsLens PRD.md        # Product Requirements Document
 └── TaskGraph.md          # Implementation Phase and Stage Graph
 ```
@@ -60,7 +61,7 @@ Define the environment variables in both `api/.env` and `mobile/.env`. Refer to 
 
 ### Step 2: Install Project Dependencies
 
-Execute bun install at the root level of each directory:
+Execute `bun install` at the root level of each directory:
 
 ```bash
 # Install API dependencies
@@ -72,26 +73,49 @@ cd ../mobile
 bun install
 ```
 
-### Step 3: Database Initialization
+### Step 3: Database Schema Migration
 
 Initialize the MySQL database and apply migration schemas:
 
 ```bash
 cd ../api
-bun prisma migrate dev
-bun prisma db seed
+bun x prisma migrate dev
+bun x prisma db seed
 ```
 
-### Step 4: Start Services
+### Step 4: Run the Entire Stack
 
-Run both development environments concurrently:
+You can start the Database (port 3307), API dev server, and Mobile Expo project concurrently using the orchestrator script in the root folder:
 
 ```bash
-# Terminal 1: API Server
-cd api
-bun run index.ts
+# Start all services
+./start.sh
+```
 
-# Terminal 2: Expo Client
-cd mobile
-bun run start
+To stop all services safely, press `Ctrl + C`. The script catches the signal and kills all background processes cleanly.
+
+---
+
+## Verification & Health Auditing
+
+### Running Tests
+To run integration tests for the API, navigate to the `api` folder and execute:
+
+```bash
+# Run Auth Verification tests
+bun run test:auth
+
+# Run Asset Registry tests
+bun run test:registry
+
+# Run Idempotent Sync Layer tests
+bun run test:sync
+```
+
+### Fallow Codebase Health Check
+Static analysis and quality guidelines are enforced using the Fallow tool. You can run checks inside either directory:
+
+```bash
+# Run health check in api or mobile folder
+bun run health
 ```

@@ -7,7 +7,9 @@
     "start": "bun run src/index.ts",
     "dev": "bun --watch src/index.ts",
     "test:auth": "bun run src/test-auth.ts",
-    "test:registry": "bun run src/test-registry.ts"
+    "test:registry": "bun run src/test-registry.ts",
+    "test:sync": "bun run src/test-sync.ts",
+    "health": "bun x fallow health"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",

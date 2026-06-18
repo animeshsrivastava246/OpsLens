@@ -45,40 +45,70 @@ function useAssetDetailsState(id: string | undefined) {
   return { asset, loading, error };
 }
 
-// fallow-ignore-next-line complexity
+function LoadingOverlay() {
+  return (
+    <View style={styles.centerContainer}>
+      <ActivityIndicator size="large" color="#38bdf8" />
+      <Text style={styles.loadingText}>Fetching asset specifications...</Text>
+    </View>
+  );
+}
+
+interface ErrorOverlayProps {
+  error: string | null;
+  onBack: () => void;
+}
+
+function ErrorOverlay({ error, onBack }: ErrorOverlayProps) {
+  const displayError = error ?? 'Asset not found in active tenancy context.';
+  return (
+    <View style={styles.centerContainer}>
+      <Text style={styles.errorText}>⚠️ Resolution Error</Text>
+      <Text style={styles.errorDesc}>{displayError}</Text>
+      <Pressable style={styles.backBtn} onPress={onBack}>
+        <Text style={styles.backBtnText}>Return to Dashboard</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function getDetailState(loading: boolean, error: string | null, asset: any): 'loading' | 'error' | 'success' {
+  if (loading) {
+    return 'loading';
+  }
+  if (error) {
+    return 'error';
+  }
+  if (!asset) {
+    return 'error';
+  }
+  return 'success';
+}
+
 export default function AssetDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { asset, loading, error } = useAssetDetailsState(id);
 
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#38bdf8" />
-        <Text style={styles.loadingText}>Fetching asset specifications...</Text>
-      </View>
-    );
+  const screenState = getDetailState(loading, error, asset);
+
+  if (screenState === 'loading') {
+    return <LoadingOverlay />;
   }
 
-  if (error || !asset) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>⚠️ Resolution Error</Text>
-        <Text style={styles.errorDesc}>{error || 'Asset not found in active tenancy context.'}</Text>
-        <Pressable style={styles.backBtn} onPress={() => router.replace('/')}>
-          <Text style={styles.backBtnText}>Return to Dashboard</Text>
-        </Pressable>
-      </View>
-    );
+  if (screenState === 'error') {
+    return <ErrorOverlay error={error} onBack={() => router.replace('/')} />;
   }
+
+  const safeAsset = asset!;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* Header Info */}
-      <AssetHeroCard asset={asset} />
+      <AssetHeroCard asset={safeAsset} />
 
       {/* Asset Specifications */}
-      <AssetSpecsCard asset={asset} />
+      <AssetSpecsCard asset={safeAsset} />
 
       {/* Available Workflow Actions */}
       <AssetWorkflowsCard />
@@ -95,12 +125,26 @@ interface SubComponentProps {
   asset: AssetDetail;
 }
 
-// fallow-ignore-next-line complexity
+function OfflineBadge({ isOnline }: { isOnline: boolean }) {
+  if (isOnline) {
+    return null;
+  }
+  return (
+    <View style={styles.offlineBadgeContainer}>
+      <Text style={styles.offlineBadge}>Offline Cache</Text>
+    </View>
+  );
+}
+
 function AssetHeroCard({ asset }: SubComponentProps) {
+  const isOnline = api.getOnline();
   return (
     <View style={styles.heroCard}>
-      <View style={styles.typeBadgeContainer}>
-        <Text style={styles.typeBadge}>{asset.assetType.name}</Text>
+      <View style={styles.badgeRow}>
+        <View style={styles.typeBadgeContainer}>
+          <Text style={styles.typeBadge}>{asset.assetType.name}</Text>
+        </View>
+        <OfflineBadge isOnline={isOnline} />
       </View>
       <Text style={styles.assetName}>{asset.name}</Text>
       <Text style={styles.siteText}>📍 {asset.site.name}</Text>
@@ -108,7 +152,6 @@ function AssetHeroCard({ asset }: SubComponentProps) {
   );
 }
 
-// fallow-ignore-next-line complexity
 function AssetSpecsCard({ asset }: SubComponentProps) {
   return (
     <View style={styles.card}>
@@ -149,7 +192,6 @@ function AssetSpecsCard({ asset }: SubComponentProps) {
   );
 }
 
-// fallow-ignore-next-line complexity
 function AssetWorkflowsCard() {
   return (
     <View style={styles.card}>
@@ -223,6 +265,25 @@ const styles = StyleSheet.create({
     borderColor: '#1e293b',
     alignItems: 'center',
     gap: 8,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  offlineBadgeContainer: {
+    backgroundColor: '#7f1d1d',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 99,
+  },
+  offlineBadge: {
+    color: '#fca5a5',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   typeBadgeContainer: {
     backgroundColor: '#0369a1',
