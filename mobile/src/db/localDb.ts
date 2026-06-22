@@ -1,8 +1,182 @@
 import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
+
+const safeStorage = {
+  getItem(key: string): string | null {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem(key);
+    }
+    return null;
+  },
+  setItem(key: string, value: string): void {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, value);
+    }
+  }
+};
+
+function updateField(obj: any, key: string, val: any) {
+  if (val !== null) {
+    obj[key] = val;
+  }
+}
+
+const runHandlers: { pattern: string; handler: (params: any[]) => void }[] = [
+  {
+    pattern: 'DELETE FROM assets',
+    handler: () => safeStorage.setItem('opslens_assets', JSON.stringify([]))
+  },
+  {
+    pattern: 'INSERT OR REPLACE INTO assets',
+    handler: (params) => {
+      const stored = safeStorage.getItem('opslens_assets');
+      const assets = stored ? JSON.parse(stored) : [];
+      const [id, name, siteId, siteName, assetTypeId, assetTypeName, organizationId, createdAt] = params;
+      const newAsset = { id, name, siteId, siteName, assetTypeId, assetTypeName, organizationId, createdAt };
+      const filtered = assets.filter((a: any) => a.id !== id);
+      filtered.push(newAsset);
+      safeStorage.setItem('opslens_assets', JSON.stringify(filtered));
+    }
+  },
+  {
+    pattern: 'UPDATE assets SET',
+    handler: (params) => {
+      const [name, siteId, assetTypeId, id] = params;
+      const stored = safeStorage.getItem('opslens_assets');
+      const assets = stored ? JSON.parse(stored) : [];
+      const asset = assets.find((a: any) => a.id === id);
+      if (asset) {
+        updateField(asset, 'name', name);
+        updateField(asset, 'siteId', siteId);
+        updateField(asset, 'assetTypeId', assetTypeId);
+        safeStorage.setItem('opslens_assets', JSON.stringify(assets));
+      }
+    }
+  },
+  {
+    pattern: 'DELETE FROM assets WHERE id = ?',
+    handler: (params) => {
+      const [id] = params;
+      const stored = safeStorage.getItem('opslens_assets');
+      const assets = stored ? JSON.parse(stored) : [];
+      safeStorage.setItem('opslens_assets', JSON.stringify(assets.filter((a: any) => a.id !== id)));
+    }
+  },
+  {
+    pattern: 'INSERT OR REPLACE INTO sync_queue',
+    handler: (params) => {
+      const [id, entity, operation, payload, status, createdAt] = params;
+      const stored = safeStorage.getItem('opslens_sync_queue');
+      const queue = stored ? JSON.parse(stored) : [];
+      const newOp = { id, entity, operation, payload, status, createdAt };
+      const filtered = queue.filter((q: any) => q.id !== id);
+      filtered.push(newOp);
+      safeStorage.setItem('opslens_sync_queue', JSON.stringify(filtered));
+    }
+  },
+  {
+    pattern: 'DELETE FROM sync_queue WHERE id = ?',
+    handler: (params) => {
+      const [id] = params;
+      const stored = safeStorage.getItem('opslens_sync_queue');
+      const queue = stored ? JSON.parse(stored) : [];
+      safeStorage.setItem('opslens_sync_queue', JSON.stringify(queue.filter((q: any) => q.id !== id)));
+    }
+  },
+  {
+    pattern: 'UPDATE sync_queue SET status = ?',
+    handler: (params) => {
+      const [status, error, id] = params;
+      const stored = safeStorage.getItem('opslens_sync_queue');
+      const queue = stored ? JSON.parse(stored) : [];
+      const op = queue.find((q: any) => q.id === id);
+      if (op) {
+        op.status = status;
+        op.error = error;
+        safeStorage.setItem('opslens_sync_queue', JSON.stringify(queue));
+      }
+    }
+  },
+  {
+    pattern: 'DELETE FROM sync_queue',
+    handler: () => safeStorage.setItem('opslens_sync_queue', JSON.stringify([]))
+  }
+];
+
+const allHandlers: { pattern: string; handler: (sql: string, params: any[]) => any[] }[] = [
+  {
+    pattern: 'FROM assets',
+    handler: () => {
+      const stored = safeStorage.getItem('opslens_assets');
+      return stored ? JSON.parse(stored) : [];
+    }
+  },
+  {
+    pattern: 'FROM sync_queue',
+    handler: (sql) => {
+      const stored = safeStorage.getItem('opslens_sync_queue');
+      const queue = stored ? JSON.parse(stored) : [];
+      if (sql.includes("status = 'pending'")) {
+        return queue.filter((q: any) => q.status === 'pending');
+      }
+      return queue;
+    }
+  }
+];
+
+const firstHandlers: { pattern: string; handler: (params: any[]) => any }[] = [
+  {
+    pattern: 'FROM assets WHERE id = ?',
+    handler: (params) => {
+      const [id] = params;
+      const stored = safeStorage.getItem('opslens_assets');
+      const assets = stored ? JSON.parse(stored) : [];
+      return assets.find((a: any) => a.id === id) || null;
+    }
+  },
+  {
+    pattern: 'SELECT COUNT(*)',
+    handler: () => {
+      const stored = safeStorage.getItem('opslens_sync_queue');
+      const queue = stored ? JSON.parse(stored) : [];
+      const count = queue.filter((q: any) => q.status === 'pending').length;
+      return { count };
+    }
+  }
+];
+
+class WebDbMock {
+  async execAsync(sql: string) {
+    // Schema creation, no-op
+  }
+  async withTransactionAsync(callback: () => Promise<void>) {
+    await callback();
+  }
+  async runAsync(sql: string, params: any[] = []) {
+    const matched = runHandlers.find(h => sql.includes(h.pattern));
+    if (matched) {
+      matched.handler(params);
+    }
+  }
+  async getAllAsync(sql: string, params: any[] = []): Promise<any[]> {
+    const matched = allHandlers.find(h => sql.includes(h.pattern));
+    return matched ? matched.handler(sql, params) : [];
+  }
+  async getFirstAsync(sql: string, params: any[] = []): Promise<any | null> {
+    const matched = firstHandlers.find(h => sql.includes(h.pattern));
+    return matched ? matched.handler(params) : null;
+  }
+}
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 
 export async function getDb(): Promise<SQLite.SQLiteDatabase> {
+  if (Platform.OS === 'web') {
+    if (!dbInstance) {
+      dbInstance = new WebDbMock() as any;
+    }
+    return dbInstance!;
+  }
   if (!dbInstance) {
     dbInstance = await SQLite.openDatabaseAsync('opslens.db');
   }

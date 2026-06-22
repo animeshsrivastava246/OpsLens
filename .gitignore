@@ -1,7 +1,34 @@
-# Local MySQL database data and logs
-db_data/
+# Dependency directories
+node_modules/
+**/node_modules/
 
-# Environment files and credentials
+# Build and distribution directories
+dist/
+out/
+build/
+web-build/
+.expo/
+*.tsbuildinfo
+
+# OS Metadata
+.DS_Store
+Thumbs.db
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Database and Local Data
+db_data/
+*.db
+*.sqlite
+
+# Environment and Secrets
 .env
 .env.local
 .env.*
@@ -9,12 +36,23 @@ api/.env
 api/.env.local
 mobile/.env
 mobile/.env.local
+*.pem
+*.key
+*.p12
+*.p8
+*.jks
+*.mobileprovision
 
-# Node dependencies
-node_modules/
-api/node_modules/
-mobile/node_modules/
-
-# Agent and skills files
+# Agent & Dev Tools
 .agents/
 skills-lock.json
+.claude/
+
+# Fallow (Feature flags/local DB)
+.fallow/
+.fallow.toml
+**/.fallow/
+**/.fallow.toml
+**/fallow/
+**/fallow.toml
+

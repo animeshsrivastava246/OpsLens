@@ -4,12 +4,12 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "bun run src/index.ts",
-    "dev": "bun --watch src/index.ts",
+    "start": "bun --watch src/index.ts",
     "test:auth": "bun run src/test-auth.ts",
     "test:registry": "bun run src/test-registry.ts",
     "test:sync": "bun run src/test-sync.ts",
-    "health": "bun x fallow health"
+    "health": "bun x fallow health",
+    "clean": "rm -rf node_modules && rm -rf bun.lock && bun install && bun x prisma generate"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",
