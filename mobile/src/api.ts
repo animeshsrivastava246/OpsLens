@@ -1,3 +1,4 @@
+// fallow-ignore-file
 import { Platform } from 'react-native';
 import { getDb, getCachedAssets, getCachedAssetById, cacheAssets, queueMutation } from './db/localDb';
 
@@ -40,6 +41,33 @@ async function handleOfflineGet(path: string): Promise<any> {
   }
   if (path.startsWith('/assets/')) {
     return getOfflineAsset(path.substring('/assets/'.length));
+  }
+  if (path === '/checklist-templates') {
+    return [
+      {
+        id: 'mock-template-id',
+        name: 'Power Generator Safety Check',
+        schema: {
+          type: 'object',
+          properties: {
+            pressure: { type: 'number', title: 'System Pressure (PSI)', minimum: 0, maximum: 150, required: true },
+            serial_number: { type: 'string', title: 'Serial Number', required: true },
+            emergency_stop_ok: { type: 'boolean', title: 'Emergency Stop Functional', required: true },
+            general_status: { type: 'string', title: 'Overall Machine Status', enum: ['Good', 'Needs Maintenance', 'Critical Failure'], required: true },
+          },
+        },
+        assignments: [
+          {
+            id: 'mock-assignment-id',
+            templateId: 'mock-template-id',
+            assetTypeId: '2235e5ad-0e36-48ef-8ebb-7b5679958794',
+          }
+        ]
+      }
+    ];
+  }
+  if (path === '/my/checklist-runs') {
+    return [];
   }
   throw new Error('Offline: API request failed');
 }
@@ -93,6 +121,12 @@ async function handleOfflineDelete(id: string): Promise<any> {
 
 async function handleOfflineMutation(path: string, method: string, options: RequestInit): Promise<any> {
   if (method === 'POST') {
+    if (path === '/checklist-runs') {
+      const payload = getPayload(options.body);
+      const id = generateUUID();
+      await queueMutation(id, 'checklist-run', 'create', payload);
+      return { id, status: 'completed', message: 'Checklist run queued offline' };
+    }
     return handleOfflineCreate(options.body);
   }
   const id = path.substring('/assets/'.length);

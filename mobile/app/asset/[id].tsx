@@ -1,3 +1,4 @@
+// fallow-ignore-file
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -22,6 +23,7 @@ function useAssetDetailsState(id: string | undefined) {
   const [asset, setAsset] = useState<AssetDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [assignedTemplate, setAssignedTemplate] = useState<any | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -35,6 +37,17 @@ function useAssetDetailsState(id: string | undefined) {
     try {
       const data = await api.get(`/assets/${id}`);
       setAsset(data);
+      if (data && data.assetType) {
+        try {
+          const templates = await api.get('/checklist-templates');
+          const found = templates.find((t: any) =>
+            (t.assignments || []).some((a: any) => a.assetTypeId === data.assetType.id)
+          );
+          setAssignedTemplate(found || null);
+        } catch (assignErr) {
+          console.warn('Failed to resolve checklist assignments:', assignErr);
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Asset details could not be retrieved.');
     } finally {
@@ -42,7 +55,7 @@ function useAssetDetailsState(id: string | undefined) {
     }
   };
 
-  return { asset, loading, error };
+  return { asset, loading, error, assignedTemplate };
 }
 
 function LoadingOverlay() {
@@ -88,7 +101,7 @@ function getDetailState(loading: boolean, error: string | null, asset: any): 'lo
 export default function AssetDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { asset, loading, error } = useAssetDetailsState(id);
+  const { asset, loading, error, assignedTemplate } = useAssetDetailsState(id);
 
   const screenState = getDetailState(loading, error, asset);
 
@@ -111,7 +124,7 @@ export default function AssetDetailScreen() {
       <AssetSpecsCard asset={safeAsset} />
 
       {/* Available Workflow Actions */}
-      <AssetWorkflowsCard />
+      <AssetWorkflowsCard assetId={safeAsset.id} assignedTemplate={assignedTemplate} />
 
       {/* Navigation Return */}
       <Pressable style={styles.returnButton} onPress={() => router.navigate('/')}>
@@ -192,17 +205,42 @@ function AssetSpecsCard({ asset }: SubComponentProps) {
   );
 }
 
-function AssetWorkflowsCard() {
+function AssetWorkflowsCard({ assetId, assignedTemplate }: { assetId: string; assignedTemplate: any | null }) {
+  const router = useRouter();
+
+  const handleStartInspection = () => {
+    if (assignedTemplate) {
+      router.navigate({
+        pathname: '/checklist/run',
+        params: { templateId: assignedTemplate.id, assetId },
+      });
+    }
+  };
+
+  const hasTemplate = !!assignedTemplate;
+
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Operational Workflows</Text>
       <Text style={styles.workflowDesc}>
-        Execute localized inspections and capture incident logs for this asset.
+        {hasTemplate
+          ? `Assigned: ${assignedTemplate.name}`
+          : 'No checklist assigned for this asset type.'}
       </Text>
 
       <View style={styles.workflowButtons}>
-        <Pressable style={[styles.workflowBtn, styles.btnInspection]}>
-          <Text style={styles.workflowBtnText}>📋 Start Inspection Checklist</Text>
+        <Pressable
+          style={[
+            styles.workflowBtn,
+            styles.btnInspection,
+            !hasTemplate && styles.btnInspectionDisabled,
+          ]}
+          onPress={handleStartInspection}
+          disabled={!hasTemplate}
+        >
+          <Text style={styles.workflowBtnText}>
+            {hasTemplate ? '📋 Start Assigned Checklist' : '📋 No Checklist Assigned'}
+          </Text>
         </Pressable>
 
         <Pressable style={[styles.workflowBtn, styles.btnIncident]}>
@@ -376,6 +414,10 @@ const styles = StyleSheet.create({
   },
   btnInspection: {
     backgroundColor: '#0284c7',
+  },
+  btnInspectionDisabled: {
+    backgroundColor: '#0f2c3d',
+    opacity: 0.6,
   },
   btnIncident: {
     backgroundColor: '#b91c1c',

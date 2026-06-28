@@ -7,15 +7,17 @@ generator client {
 }
 
 model Organization {
-  id                 String              @id @default(uuid())
+  id                 String                @id @default(uuid())
   name               String
   sites              Site[]
   users              Membership[]
   assets             Asset[]
   incidents          Incident[]
   checklistTemplates ChecklistTemplate[]
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  checklistAssignments ChecklistAssignment[]
+  checklistRuns      ChecklistRun[]
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 }
 
 model Site {
@@ -78,11 +80,12 @@ model Membership {
 }
 
 model AssetType {
-  id        String   @id @default(uuid())
-  name      String
-  assets    Asset[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String                @id @default(uuid())
+  name        String
+  assets      Asset[]
+  assignments ChecklistAssignment[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
 }
 
 model Asset {
@@ -103,6 +106,7 @@ model Asset {
 model ChecklistTemplate {
   id             String                @id @default(uuid())
   name           String
+  schema         Json                  // JSON Schema defining questions and validation
   organizationId String
   organization   Organization          @relation(fields: [organizationId], references: [id])
   assignments    ChecklistAssignment[]
@@ -112,22 +116,29 @@ model ChecklistTemplate {
 }
 
 model ChecklistAssignment {
-  id         String            @id @default(uuid())
-  templateId String
-  template   ChecklistTemplate @relation(fields: [templateId], references: [id])
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  id             String            @id @default(uuid())
+  templateId     String
+  template       ChecklistTemplate @relation(fields: [templateId], references: [id])
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  assetTypeId    String?           // Optional asset type assignment
+  assetType      AssetType?        @relation(fields: [assetTypeId], references: [id])
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 }
 
 model ChecklistRun {
-  id         String              @id @default(uuid())
-  templateId String
-  template   ChecklistTemplate   @relation(fields: [templateId], references: [id])
-  assetId    String?
-  asset      Asset?              @relation(fields: [assetId], references: [id])
-  responses  ChecklistResponse[]
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
+  id             String              @id @default(uuid())
+  templateId     String
+  template       ChecklistTemplate   @relation(fields: [templateId], references: [id])
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id])
+  assetId        String?
+  asset          Asset?              @relation(fields: [assetId], references: [id])
+  responses      ChecklistResponse[]
+  status         String              @default("completed") // completed or draft
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 }
 
 model ChecklistResponse {

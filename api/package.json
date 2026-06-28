@@ -8,6 +8,7 @@
     "test:auth": "bun run src/test-auth.ts",
     "test:registry": "bun run src/test-registry.ts",
     "test:sync": "bun run src/test-sync.ts",
+    "test:checklists": "bun run src/test-checklists.ts",
     "health": "bun x fallow health",
     "clean": "rm -rf node_modules && rm -rf bun.lock && bun install && bun x prisma generate"
   },

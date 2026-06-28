@@ -132,7 +132,36 @@ async function seedAssets(acmeOrgId: string) {
     },
   });
 
+  // Seed checklist template
+  const templateSchema = {
+    type: 'object',
+    properties: {
+      serial_number: { type: 'string', title: 'Serial Number', required: true },
+      pressure: { type: 'number', title: 'System Pressure (PSI)', minimum: 0, maximum: 150, required: true },
+      emergency_stop_ok: { type: 'boolean', title: 'Emergency Stop Functional', required: true },
+      general_status: { type: 'string', title: 'Overall Machine Status', enum: ['Good', 'Needs Maintenance', 'Critical Failure'], required: true },
+    },
+  };
+
+  const template = await prisma.checklistTemplate.create({
+    data: {
+      name: 'Power Generator Safety Check',
+      schema: templateSchema,
+      organizationId: acmeOrgId,
+    },
+  });
+
+  // Assign template to Power Generator type
+  const assignment = await prisma.checklistAssignment.create({
+    data: {
+      templateId: template.id,
+      assetTypeId: generatorAssetType.id,
+      organizationId: acmeOrgId,
+    },
+  });
+
   console.log(`Seeded Site: ${acmeSite.name}, Asset: ${mainGenerator.name}`);
+  console.log(`Seeded Checklist: ${template.name}, Assigned to Type: ${generatorAssetType.name}`);
 }
 
 async function main() {
