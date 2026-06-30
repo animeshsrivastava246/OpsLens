@@ -26,7 +26,7 @@ flowchart TD
     end
 ```
 
-## Phase 1: Foundation
+## Phase 1: Foundation [COMPLETED]
 
 ### Stage 1.1: Environment Setup [COMPLETED]
 Tech: Expo 56, React Native.
@@ -62,17 +62,17 @@ Req: [x] Write idempotent reconciliation endpoints.
 Pass: [x] App operates without network.
 Pass: [x] Queues flush upon reconnection.
 
-## Phase 2: Workflow Operations
+## Phase 2: Workflow Operations [IN PROGRESS]
 
-### Stage 2.1: Checklist Engine
+### Stage 2.1: Checklist Engine [COMPLETED]
 Tech: JSON Schema, Prisma relations.
-Req: Define dynamic question types.
-Req: Build form template APIs.
-Req: Implement dynamic React renderer.
-Pass: Checklists render strictly defined.
-Pass: Validations trigger exactly accurately.
+Req: [x] Define dynamic question types.
+Req: [x] Build form template APIs.
+Req: [x] Implement dynamic React renderer.
+Pass: [x] Checklists render strictly defined.
+Pass: [x] Validations trigger exactly accurately.
 
-### Stage 2.2: Inspection Execution
+### Stage 2.2: Inspection Execution [IN PROGRESS]
 Tech: SQLite offline form caching.
 Req: Cache assigned checklists locally.
 Req: Auto-save draft responses locally.
