@@ -1,5 +1,13 @@
-import * as SQLite from 'expo-sqlite';
-import { Platform } from 'react-native';
+import type * as SQLiteType from 'expo-sqlite';
+
+let SQLite: any = null;
+if (typeof window === 'undefined') {
+  const sqliteModule = 'expo-sqlite';
+  const req = (globalThis as any).nodeRequire || (globalThis as any).require;
+  if (req) {
+    SQLite = req(sqliteModule);
+  }
+}
 
 const safeStorage = {
   getItem(key: string): string | null {
@@ -100,6 +108,120 @@ const runHandlers: { pattern: string; handler: (params: any[]) => void }[] = [
   {
     pattern: 'DELETE FROM sync_queue',
     handler: () => safeStorage.setItem('opslens_sync_queue', JSON.stringify([]))
+  },
+  {
+    pattern: 'DELETE FROM checklist_templates',
+    handler: () => safeStorage.setItem('opslens_templates', JSON.stringify([]))
+  },
+  {
+    pattern: 'INSERT OR REPLACE INTO checklist_templates',
+    handler: (params) => {
+      const stored = safeStorage.getItem('opslens_templates');
+      const list = stored ? JSON.parse(stored) : [];
+      const [id, name, schema, organizationId] = params;
+      const item = { id, name, schema, organizationId };
+      const filtered = list.filter((x: any) => x.id !== id);
+      filtered.push(item);
+      safeStorage.setItem('opslens_templates', JSON.stringify(filtered));
+    }
+  },
+  {
+    pattern: 'DELETE FROM checklist_assignments',
+    handler: () => safeStorage.setItem('opslens_assignments', JSON.stringify([]))
+  },
+  {
+    pattern: 'INSERT OR REPLACE INTO checklist_assignments',
+    handler: (params) => {
+      const stored = safeStorage.getItem('opslens_assignments');
+      const list = stored ? JSON.parse(stored) : [];
+      const [id, templateId, assetTypeId, organizationId] = params;
+      const item = { id, templateId, assetTypeId, organizationId };
+      const filtered = list.filter((x: any) => x.id !== id);
+      filtered.push(item);
+      safeStorage.setItem('opslens_assignments', JSON.stringify(filtered));
+    }
+  },
+  {
+    pattern: 'INSERT OR REPLACE INTO checklist_runs',
+    handler: (params) => {
+      const stored = safeStorage.getItem('opslens_runs');
+      const list = stored ? JSON.parse(stored) : [];
+      const [id, templateId, assetId, status, createdAt] = params;
+      const item = { id, templateId, assetId, status, createdAt };
+      const filtered = list.filter((x: any) => x.id !== id);
+      filtered.push(item);
+      safeStorage.setItem('opslens_runs', JSON.stringify(filtered));
+    }
+  },
+  {
+    pattern: 'INSERT OR REPLACE INTO checklist_responses',
+    handler: (params) => {
+      const stored = safeStorage.getItem('opslens_responses');
+      const list = stored ? JSON.parse(stored) : [];
+      const [runId, questionId, value] = params;
+      const item = { runId, questionId, value };
+      const filtered = list.filter((x: any) => !(x.runId === runId && x.questionId === questionId));
+      filtered.push(item);
+      safeStorage.setItem('opslens_responses', JSON.stringify(filtered));
+    }
+  },
+  {
+    pattern: 'DELETE FROM checklist_runs WHERE id = ?',
+    handler: (params) => {
+      const [id] = params;
+      const stored = safeStorage.getItem('opslens_runs');
+      const list = stored ? JSON.parse(stored) : [];
+      safeStorage.setItem('opslens_runs', JSON.stringify(list.filter((x: any) => x.id !== id)));
+    }
+  },
+  {
+    pattern: 'DELETE FROM checklist_responses WHERE runId = ?',
+    handler: (params) => {
+      const [runId] = params;
+      const stored = safeStorage.getItem('opslens_responses');
+      const list = stored ? JSON.parse(stored) : [];
+      safeStorage.setItem('opslens_responses', JSON.stringify(list.filter((x: any) => x.runId !== runId)));
+    }
+  },
+  {
+    pattern: 'DELETE FROM media_upload_queue WHERE id = ?',
+    handler: (params) => {
+      const [id] = params;
+      const stored = safeStorage.getItem('opslens_media_queue');
+      const list = stored ? JSON.parse(stored) : [];
+      safeStorage.setItem('opslens_media_queue', JSON.stringify(list.filter((x: any) => x.id !== id)));
+    }
+  },
+  {
+    pattern: 'INSERT OR REPLACE INTO media_upload_queue',
+    handler: (params) => {
+      const stored = safeStorage.getItem('opslens_media_queue');
+      const list = stored ? JSON.parse(stored) : [];
+      const [id, localUri, remoteUrl, status, retryCount, error] = params;
+      const item = { id, localUri, remoteUrl, status, retryCount, error };
+      const filtered = list.filter((x: any) => x.id !== id);
+      filtered.push(item);
+      safeStorage.setItem('opslens_media_queue', JSON.stringify(filtered));
+    }
+  },
+  {
+    pattern: 'UPDATE media_upload_queue SET status = ?',
+    handler: (params) => {
+      const [status, error, retryCount, id] = params;
+      const stored = safeStorage.getItem('opslens_media_queue');
+      const list = stored ? JSON.parse(stored) : [];
+      const item = list.find((x: any) => x.id === id);
+      if (item) {
+        item.status = status;
+        item.retryCount = retryCount;
+        item.error = error;
+        safeStorage.setItem('opslens_media_queue', JSON.stringify(list));
+      }
+    }
+  },
+  {
+    pattern: 'DELETE FROM media_upload_queue',
+    handler: () => safeStorage.setItem('opslens_media_queue', JSON.stringify([]))
   }
 ];
 
@@ -121,6 +243,40 @@ const allHandlers: { pattern: string; handler: (sql: string, params: any[]) => a
       }
       return queue;
     }
+  },
+  {
+    pattern: 'FROM media_upload_queue',
+    handler: (sql) => {
+      const stored = safeStorage.getItem('opslens_media_queue');
+      const list = stored ? JSON.parse(stored) : [];
+      if (sql.includes("status = 'pending'") || sql.includes("status = 'failed'")) {
+        return list.filter((x: any) => x.status === 'pending' || x.status === 'failed');
+      }
+      return list;
+    }
+  },
+  {
+    pattern: 'FROM checklist_templates',
+    handler: () => {
+      const stored = safeStorage.getItem('opslens_templates');
+      return stored ? JSON.parse(stored) : [];
+    }
+  },
+  {
+    pattern: 'FROM checklist_assignments',
+    handler: () => {
+      const stored = safeStorage.getItem('opslens_assignments');
+      return stored ? JSON.parse(stored) : [];
+    }
+  },
+  {
+    pattern: 'FROM checklist_responses WHERE runId = ?',
+    handler: (sql, params) => {
+      const [runId] = params;
+      const stored = safeStorage.getItem('opslens_responses');
+      const list = stored ? JSON.parse(stored) : [];
+      return list.filter((x: any) => x.runId === runId);
+    }
   }
 ];
 
@@ -141,6 +297,24 @@ const firstHandlers: { pattern: string; handler: (params: any[]) => any }[] = [
       const queue = stored ? JSON.parse(stored) : [];
       const count = queue.filter((q: any) => q.status === 'pending').length;
       return { count };
+    }
+  },
+  {
+    pattern: 'FROM checklist_runs WHERE id = ?',
+    handler: (params) => {
+      const [id] = params;
+      const stored = safeStorage.getItem('opslens_runs');
+      const list = stored ? JSON.parse(stored) : [];
+      return list.find((x: any) => x.id === id) || null;
+    }
+  },
+  {
+    pattern: "FROM checklist_runs WHERE assetId = ? AND status = 'draft'",
+    handler: (params) => {
+      const [assetId] = params;
+      const stored = safeStorage.getItem('opslens_runs');
+      const list = stored ? JSON.parse(stored) : [];
+      return list.find((x: any) => x.assetId === assetId && x.status === 'draft') || null;
     }
   }
 ];
@@ -168,10 +342,10 @@ class WebDbMock {
   }
 }
 
-let dbInstance: SQLite.SQLiteDatabase | null = null;
+let dbInstance: SQLiteType.SQLiteDatabase | null = null;
 
-export async function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (Platform.OS === 'web') {
+export async function getDb(): Promise<SQLiteType.SQLiteDatabase> {
+  if (typeof window !== 'undefined') {
     if (!dbInstance) {
       dbInstance = new WebDbMock() as any;
     }
@@ -180,7 +354,7 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (!dbInstance) {
     dbInstance = await SQLite.openDatabaseAsync('opslens.db');
   }
-  return dbInstance;
+  return dbInstance!;
 }
 
 export async function initDb() {
@@ -210,6 +384,59 @@ export async function initDb() {
       status TEXT DEFAULT 'pending',
       error TEXT,
       createdAt TEXT NOT NULL
+    );
+  `);
+
+  // Table for cached checklist templates
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS checklist_templates (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      schema TEXT NOT NULL,
+      organizationId TEXT NOT NULL
+    );
+  `);
+
+  // Table for cached checklist assignments
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS checklist_assignments (
+      id TEXT PRIMARY KEY NOT NULL,
+      templateId TEXT NOT NULL,
+      assetTypeId TEXT,
+      organizationId TEXT NOT NULL
+    );
+  `);
+
+  // Table for cached draft runs
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS checklist_runs (
+      id TEXT PRIMARY KEY NOT NULL,
+      templateId TEXT NOT NULL,
+      assetId TEXT,
+      status TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    );
+  `);
+
+  // Table for cached draft responses
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS checklist_responses (
+      runId TEXT NOT NULL,
+      questionId TEXT NOT NULL,
+      value TEXT NOT NULL,
+      PRIMARY KEY (runId, questionId)
+    );
+  `);
+
+  // Table for offline media upload queue
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS media_upload_queue (
+      id TEXT PRIMARY KEY NOT NULL,
+      localUri TEXT NOT NULL,
+      remoteUrl TEXT NOT NULL,
+      status TEXT NOT NULL,
+      retryCount INTEGER DEFAULT 0,
+      error TEXT
     );
   `);
 }
@@ -330,4 +557,156 @@ export async function getQueueCount(): Promise<number> {
 export async function clearSyncQueue() {
   const db = await getDb();
   await db.runAsync('DELETE FROM sync_queue');
+}
+
+export async function cacheChecklists(templates: any[]) {
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM checklist_templates');
+    for (const temp of templates) {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO checklist_templates (id, name, schema, organizationId) VALUES (?, ?, ?, ?)',
+        [temp.id, temp.name, JSON.stringify(temp.schema), temp.organizationId]
+      );
+    }
+  });
+}
+
+export async function cacheAssignments(assignments: any[]) {
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM checklist_assignments');
+    for (const ass of assignments) {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO checklist_assignments (id, templateId, assetTypeId, organizationId) VALUES (?, ?, ?, ?)',
+        [ass.id, ass.templateId, ass.assetTypeId || null, ass.organizationId]
+      );
+    }
+  });
+}
+
+export async function getCachedChecklists(): Promise<any[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync('SELECT * FROM checklist_templates');
+  return rows.map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    schema: JSON.parse(row.schema),
+    organizationId: row.organizationId
+  }));
+}
+
+export async function getCachedAssignments(): Promise<any[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync('SELECT * FROM checklist_assignments');
+  return rows.map((row: any) => ({
+    id: row.id,
+    templateId: row.templateId,
+    assetTypeId: row.assetTypeId,
+    organizationId: row.organizationId
+  }));
+}
+
+export async function saveDraftRun(runId: string, templateId: string, assetId: string | null, status: string) {
+  const db = await getDb();
+  await db.runAsync(
+    'INSERT OR REPLACE INTO checklist_runs (id, templateId, assetId, status, createdAt) VALUES (?, ?, ?, ?, ?)',
+    [runId, templateId, assetId, status, new Date().toISOString()]
+  );
+}
+
+export async function saveDraftResponses(runId: string, responses: Array<{ questionId: string; value: any }>) {
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    for (const resp of responses) {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO checklist_responses (runId, questionId, value) VALUES (?, ?, ?)',
+        [runId, resp.questionId, JSON.stringify(resp.value)]
+      );
+    }
+  });
+}
+
+export async function getDraftRun(runId: string): Promise<any | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync('SELECT * FROM checklist_runs WHERE id = ?', [runId]);
+  if (!row) return null;
+  const r = row as any;
+  return {
+    id: r.id,
+    templateId: r.templateId,
+    assetId: r.assetId,
+    status: r.status,
+    createdAt: r.createdAt
+  };
+}
+
+export async function getDraftResponses(runId: string): Promise<Array<{ questionId: string; value: any }>> {
+  const db = await getDb();
+  const rows = await db.getAllAsync('SELECT * FROM checklist_responses WHERE runId = ?', [runId]);
+  return rows.map((row: any) => ({
+    questionId: row.questionId,
+    value: JSON.parse(row.value)
+  }));
+}
+
+export async function deleteDraftRun(runId: string) {
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM checklist_runs WHERE id = ?', [runId]);
+    await db.runAsync('DELETE FROM checklist_responses WHERE runId = ?', [runId]);
+  });
+}
+
+export async function getDraftRunByAssetId(assetId: string): Promise<any | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync("SELECT * FROM checklist_runs WHERE assetId = ? AND status = 'draft'", [assetId]);
+  if (!row) return null;
+  const r = row as any;
+  return {
+    id: r.id,
+    templateId: r.templateId,
+    assetId: r.assetId,
+    status: r.status,
+    createdAt: r.createdAt
+  };
+}
+
+export async function queueMediaUpload(id: string, localUri: string, remoteUrl: string) {
+  const db = await getDb();
+  await db.runAsync(
+    'INSERT OR REPLACE INTO media_upload_queue (id, localUri, remoteUrl, status, retryCount) VALUES (?, ?, ?, ?, ?)',
+    [id, localUri, remoteUrl, 'pending', 0]
+  );
+}
+
+export async function getPendingUploads(): Promise<any[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync("SELECT * FROM media_upload_queue WHERE status = 'pending' OR status = 'failed' ORDER BY id ASC");
+  return rows.map((row: any) => ({
+    id: row.id,
+    localUri: row.localUri,
+    remoteUrl: row.remoteUrl,
+    status: row.status,
+    retryCount: row.retryCount,
+    error: row.error
+  }));
+}
+
+export async function markUploadCompleted(id: string) {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM media_upload_queue WHERE id = ?', [id]);
+}
+
+export async function markUploadFailed(id: string, error: string, retryCount: number) {
+  const db = await getDb();
+  await db.runAsync(
+    'UPDATE media_upload_queue SET status = ?, error = ?, retryCount = ? WHERE id = ?',
+    ['failed', error, retryCount, id]
+  );
+}
+
+export async function clearMediaUploadQueue() {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM media_upload_queue');
 }

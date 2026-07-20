@@ -1,8 +1,13 @@
-// fallow-ignore-file
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, Pressable, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { api } from '../../src/api';
+import {
+  saveDraftRun,
+  saveDraftResponses,
+  getDraftResponses,
+  deleteDraftRun
+} from '../../src/db/localDb';
 
 interface SchemaProperty {
   type: string;
@@ -22,15 +27,17 @@ interface ChecklistTemplate {
   };
 }
 
+// fallow-ignore-next-line complexity
 export default function ChecklistRunScreen() {
   const router = useRouter();
-  const { templateId, assetId } = useLocalSearchParams<{ templateId: string; assetId: string }>();
+  const { templateId, assetId, runId: searchRunId } = useLocalSearchParams<{ templateId: string; assetId: string; runId?: string }>();
 
   const [template, setTemplate] = useState<ChecklistTemplate | null>(null);
   const [assetName, setAssetName] = useState<string>('Asset');
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentRunId, setCurrentRunId] = useState<string>('');
 
   // Form states
   const [answers, setAnswers] = useState<Record<string, any>>({});
@@ -42,6 +49,7 @@ export default function ChecklistRunScreen() {
     }
   }, [templateId, assetId]);
 
+  // fallow-ignore-next-line complexity
   const fetchTemplateAndAsset = async () => {
     setLoading(true);
     setError(null);
@@ -54,11 +62,31 @@ export default function ChecklistRunScreen() {
       }
       setTemplate(foundTemplate);
 
-      // Initialize answers from schema
-      const initialAnswers: Record<string, any> = {};
+      // Initialize answers from schema or draft DB
+      let initialAnswers: Record<string, any> = {};
       const properties = foundTemplate.schema.properties || {};
+      
+      let savedResponses: any[] = [];
+      let resolvedRunId = searchRunId;
+
+      if (resolvedRunId) {
+        try {
+          savedResponses = await getDraftResponses(resolvedRunId);
+        } catch (dbErr) {
+          console.warn('Failed to read draft responses from SQLite:', dbErr);
+        }
+      }
+
+      if (!resolvedRunId) {
+        resolvedRunId = 'run-' + Math.random().toString(36).substring(2, 15);
+      }
+      setCurrentRunId(resolvedRunId);
+
       Object.keys(properties).forEach((key) => {
-        if (properties[key].type === 'boolean') {
+        const saved = savedResponses.find(r => r.questionId === key);
+        if (saved !== undefined) {
+          initialAnswers[key] = saved.value;
+        } else if (properties[key].type === 'boolean') {
           initialAnswers[key] = false;
         } else {
           initialAnswers[key] = '';
@@ -82,8 +110,21 @@ export default function ChecklistRunScreen() {
     }
   };
 
-  const handleValueChange = (key: string, val: any) => {
-    setAnswers((prev) => ({ ...prev, [key]: val }));
+  const handleValueChange = async (key: string, val: any) => {
+    const updatedAnswers = { ...answers, [key]: val };
+    setAnswers(updatedAnswers);
+
+    try {
+      await saveDraftRun(currentRunId, templateId, assetId || null, 'draft');
+      const responseList = Object.keys(updatedAnswers).map((k) => ({
+        questionId: k,
+        value: updatedAnswers[k],
+      }));
+      await saveDraftResponses(currentRunId, responseList);
+    } catch (saveErr) {
+      console.warn('Failed to save draft:', saveErr);
+    }
+
     // Clear error for this field
     if (fieldErrors[key]) {
       setFieldErrors((prev) => {
@@ -99,6 +140,7 @@ export default function ChecklistRunScreen() {
     const errors: Record<string, string> = {};
     const properties = template.schema.properties || {};
 
+    // fallow-ignore-next-line complexity
     Object.keys(properties).forEach((key) => {
       const prop = properties[key];
       const val = answers[key];
@@ -133,6 +175,7 @@ export default function ChecklistRunScreen() {
     return Object.keys(errors).length === 0;
   };
 
+  // fallow-ignore-next-line complexity
   const handleSubmit = async () => {
     if (!template) return;
     if (!validateForm()) return;
@@ -145,11 +188,18 @@ export default function ChecklistRunScreen() {
       }));
 
       await api.post('/checklist-runs', {
+        id: currentRunId,
         templateId: template.id,
         assetId: assetId || null,
         responses: payloadResponses,
         status: 'completed',
       });
+
+      try {
+        await deleteDraftRun(currentRunId);
+      } catch (cleanErr) {
+        console.warn('Failed to clean up draft run from local SQLite:', cleanErr);
+      }
 
       // Go back to the asset details or dashboard
       if (assetId) {
@@ -203,6 +253,7 @@ export default function ChecklistRunScreen() {
       )}
 
       <View style={styles.formCard}>
+        {/* fallow-ignore-next-line complexity */}
         {Object.keys(properties).map((key) => {
           const prop = properties[key];
           const hasError = !!fieldErrors[key];

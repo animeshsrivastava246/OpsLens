@@ -72,21 +72,21 @@ Req: [x] Implement dynamic React renderer.
 Pass: [x] Checklists render strictly defined.
 Pass: [x] Validations trigger exactly accurately.
 
-### Stage 2.2: Inspection Execution [IN PROGRESS]
+### Stage 2.2: Inspection Execution [COMPLETED]
 Tech: SQLite offline form caching.
-Req: Cache assigned checklists locally.
-Req: Auto-save draft responses locally.
-Req: Sync responses on reconnect.
-Pass: UI thread never blocks.
-Pass: Responses sync completely reliably.
+Req: [x] Cache assigned checklists locally.
+Req: [x] Auto-save draft responses locally.
+Req: [x] Sync responses on reconnect.
+Pass: [x] UI thread never blocks.
+Pass: [x] Responses sync completely reliably.
 
-### Stage 2.3: Incident Capture
+### Stage 2.3: Incident Capture [COMPLETED]
 Tech: expo-image-picker, S3 URLs.
-Req: Build incident reporting screens.
-Req: Capture severity and photos.
-Req: Implement background upload workers.
-Pass: Media uploads succeed perfectly.
-Pass: Failed uploads retry automatically.
+Req: [x] Build incident reporting screens.
+Req: [x] Capture severity and photos.
+Req: [x] Implement background upload workers.
+Pass: [x] Media uploads succeed perfectly.
+Pass: [x] Failed uploads retry automatically.
 
 ### Stage 2.4: Corrective Actions
 Tech: Status machines, API routing.

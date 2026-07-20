@@ -155,6 +155,7 @@ model Incident {
   id             String       @id @default(uuid())
   title          String
   description    String?
+  severity       String       @default("medium")
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   assetId        String?

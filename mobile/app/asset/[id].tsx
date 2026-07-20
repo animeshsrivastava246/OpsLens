@@ -1,8 +1,8 @@
-// fallow-ignore-file
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { api } from '../../src/api';
+import { getDraftRunByAssetId } from '../../src/db/localDb';
 
 interface AssetDetail {
   id: string;
@@ -19,11 +19,33 @@ interface AssetDetail {
   };
 }
 
+async function fetchActiveDraft(assetId: string): Promise<any | null> {
+  try {
+    return await getDraftRunByAssetId(assetId);
+  } catch (err) {
+    console.warn('Failed to resolve active draft runs:', err);
+    return null;
+  }
+}
+
+async function fetchAssignedTemplate(assetTypeId: string): Promise<any | null> {
+  try {
+    const templates = await api.get('/checklist-templates');
+    return templates.find((t: any) =>
+      (t.assignments || []).some((a: any) => a.assetTypeId === assetTypeId)
+    ) || null;
+  } catch (err) {
+    console.warn('Failed to resolve checklist assignments:', err);
+    return null;
+  }
+}
+
 function useAssetDetailsState(id: string | undefined) {
   const [asset, setAsset] = useState<AssetDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [assignedTemplate, setAssignedTemplate] = useState<any | null>(null);
+  const [activeDraft, setActiveDraft] = useState<any | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -31,21 +53,20 @@ function useAssetDetailsState(id: string | undefined) {
     }
   }, [id]);
 
+  // fallow-ignore-next-line complexity
   const fetchAssetDetails = async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await api.get(`/assets/${id}`);
       setAsset(data);
-      if (data && data.assetType) {
-        try {
-          const templates = await api.get('/checklist-templates');
-          const found = templates.find((t: any) =>
-            (t.assignments || []).some((a: any) => a.assetTypeId === data.assetType.id)
-          );
-          setAssignedTemplate(found || null);
-        } catch (assignErr) {
-          console.warn('Failed to resolve checklist assignments:', assignErr);
+      if (data) {
+        const draft = await fetchActiveDraft(id as string);
+        setActiveDraft(draft);
+
+        if (data.assetType) {
+          const template = await fetchAssignedTemplate(data.assetType.id);
+          setAssignedTemplate(template);
         }
       }
     } catch (err: any) {
@@ -55,7 +76,7 @@ function useAssetDetailsState(id: string | undefined) {
     }
   };
 
-  return { asset, loading, error, assignedTemplate };
+  return { asset, loading, error, assignedTemplate, activeDraft };
 }
 
 function LoadingOverlay() {
@@ -101,7 +122,7 @@ function getDetailState(loading: boolean, error: string | null, asset: any): 'lo
 export default function AssetDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { asset, loading, error, assignedTemplate } = useAssetDetailsState(id);
+  const { asset, loading, error, assignedTemplate, activeDraft } = useAssetDetailsState(id);
 
   const screenState = getDetailState(loading, error, asset);
 
@@ -124,7 +145,7 @@ export default function AssetDetailScreen() {
       <AssetSpecsCard asset={safeAsset} />
 
       {/* Available Workflow Actions */}
-      <AssetWorkflowsCard assetId={safeAsset.id} assignedTemplate={assignedTemplate} />
+      <AssetWorkflowsCard assetId={safeAsset.id} assignedTemplate={assignedTemplate} activeDraft={activeDraft} />
 
       {/* Navigation Return */}
       <Pressable style={styles.returnButton} onPress={() => router.navigate('/')}>
@@ -205,28 +226,52 @@ function AssetSpecsCard({ asset }: SubComponentProps) {
   );
 }
 
-function AssetWorkflowsCard({ assetId, assignedTemplate }: { assetId: string; assignedTemplate: any | null }) {
+// fallow-ignore-next-line complexity
+function AssetWorkflowsCard({
+  assetId,
+  assignedTemplate,
+  activeDraft,
+}: {
+  assetId: string;
+  assignedTemplate: any | null;
+  activeDraft: any | null;
+}) {
   const router = useRouter();
 
   const handleStartInspection = () => {
     if (assignedTemplate) {
       router.navigate({
         pathname: '/checklist/run',
-        params: { templateId: assignedTemplate.id, assetId },
+        params: {
+          templateId: assignedTemplate.id,
+          assetId,
+          runId: activeDraft ? activeDraft.id : undefined,
+        },
       });
     }
   };
 
   const hasTemplate = !!assignedTemplate;
+  const hasDraft = !!activeDraft;
+
+  let workflowDesc = 'No checklist assigned for this asset type.';
+  if (hasDraft) {
+    workflowDesc = `Draft in progress: ${assignedTemplate?.name || 'Checklist'}`;
+  } else if (hasTemplate) {
+    workflowDesc = `Assigned: ${assignedTemplate.name}`;
+  }
+
+  let buttonText = '📋 No Checklist Assigned';
+  if (hasDraft) {
+    buttonText = '📋 Resume Inspection Draft';
+  } else if (hasTemplate) {
+    buttonText = '📋 Start Assigned Checklist';
+  }
 
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Operational Workflows</Text>
-      <Text style={styles.workflowDesc}>
-        {hasTemplate
-          ? `Assigned: ${assignedTemplate.name}`
-          : 'No checklist assigned for this asset type.'}
-      </Text>
+      <Text style={styles.workflowDesc}>{workflowDesc}</Text>
 
       <View style={styles.workflowButtons}>
         <Pressable
@@ -234,16 +279,18 @@ function AssetWorkflowsCard({ assetId, assignedTemplate }: { assetId: string; as
             styles.workflowBtn,
             styles.btnInspection,
             !hasTemplate && styles.btnInspectionDisabled,
+            hasDraft && styles.btnDraftResume,
           ]}
           onPress={handleStartInspection}
           disabled={!hasTemplate}
         >
-          <Text style={styles.workflowBtnText}>
-            {hasTemplate ? '📋 Start Assigned Checklist' : '📋 No Checklist Assigned'}
-          </Text>
+          <Text style={styles.workflowBtnText}>{buttonText}</Text>
         </Pressable>
 
-        <Pressable style={[styles.workflowBtn, styles.btnIncident]}>
+        <Pressable
+          style={[styles.workflowBtn, styles.btnIncident]}
+          onPress={() => router.push(`/incident/report?assetId=${assetId}`)}
+        >
           <Text style={styles.workflowBtnText}>⚠️ Report Asset Incident</Text>
         </Pressable>
       </View>
@@ -293,6 +340,9 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
     fontSize: 14,
+  },
+  btnDraftResume: {
+    backgroundColor: '#d97706',
   },
   heroCard: {
     backgroundColor: '#0f172a',

@@ -1,11 +1,36 @@
 // fallow-ignore-file
-import { Platform } from 'react-native';
-import { getDb, getCachedAssets, getCachedAssetById, cacheAssets, queueMutation } from './db/localDb';
+import {
+  getDb,
+  getCachedAssets,
+  getCachedAssetById,
+  cacheAssets,
+  queueMutation,
+  cacheChecklists,
+  cacheAssignments,
+  getCachedChecklists,
+  getCachedAssignments,
+  getPendingUploads,
+  markUploadCompleted,
+  markUploadFailed
+} from './db/localDb';
+
+let isAndroid = false;
+let isWeb = typeof window !== 'undefined';
+
+if (typeof window === 'undefined') {
+  // Running in Node/Bun tests
+} else {
+  try {
+    const { Platform } = require('react-native');
+    isAndroid = Platform.OS === 'android';
+    isWeb = Platform.OS === 'web';
+  } catch (e) {}
+}
 
 // Resolve backend URL based on execution environment
 // Android emulator uses 10.0.2.2, iOS/Web use localhost
 const getBaseUrl = () => {
-  if (Platform.OS === 'android') {
+  if (isAndroid) {
     return 'http://10.0.2.2:3000';
   }
   return 'http://localhost:3000';
@@ -43,6 +68,14 @@ async function handleOfflineGet(path: string): Promise<any> {
     return getOfflineAsset(path.substring('/assets/'.length));
   }
   if (path === '/checklist-templates') {
+    const cached = await getCachedChecklists();
+    if (cached.length > 0) {
+      const assignments = await getCachedAssignments();
+      return cached.map((t: any) => ({
+        ...t,
+        assignments: assignments.filter((a: any) => a.templateId === t.id)
+      }));
+    }
     return [
       {
         id: 'mock-template-id',
@@ -181,8 +214,14 @@ async function handleOnlineRequest(path: string, method: string, options: Reques
 
     const data = await parseResponse(res);
 
-    if (method === 'GET' && path === '/assets') {
-      await cacheAssets(data);
+    if (method === 'GET') {
+      if (path === '/assets') {
+        await cacheAssets(data);
+      } else if (path === '/checklist-templates') {
+        await cacheChecklists(data);
+        const assignments = data.flatMap((t: any) => t.assignments || []);
+        await cacheAssignments(assignments);
+      }
     }
 
     return data;
@@ -232,3 +271,45 @@ export const api = {
     return this.request(path, { method: 'DELETE' });
   }
 };
+
+async function uploadMediaFile(localUri: string, token: string | null): Promise<string> {
+  if (isWeb) {
+    const filename = localUri.substring(localUri.lastIndexOf('/') + 1) || 'mock.jpg';
+    return `https://opslens-assets.s3.amazonaws.com/uploads/${filename}`;
+  }
+
+  const FileSystem = require('expo-file-system');
+  const response = await FileSystem.uploadAsync(`${API_BASE_URL}/media/upload`, localUri, {
+    httpMethod: 'POST',
+    uploadType: FileSystem.UploadType.BINARY_CONTENT,
+    headers: {
+      'Authorization': token ? `Bearer ${token}` : '',
+      'Content-Type': 'image/jpeg',
+    }
+  });
+
+  if (response.status !== 200) {
+    throw new Error(`Upload failed with status ${response.status}`);
+  }
+
+  const data = JSON.parse(response.body);
+  return data.url;
+}
+
+export async function flushMediaUploads() {
+  const pending = await getPendingUploads();
+  
+  for (const upload of pending) {
+    if (upload.retryCount >= 5) {
+      console.warn(`Upload ${upload.id} exceeded maximum retries.`);
+      continue;
+    }
+    try {
+      await uploadMediaFile(upload.localUri, apiToken);
+      await markUploadCompleted(upload.id);
+    } catch (err: any) {
+      console.error(`Failed to upload ${upload.id}:`, err.message);
+      await markUploadFailed(upload.id, err.message, upload.retryCount + 1);
+    }
+  }
+}

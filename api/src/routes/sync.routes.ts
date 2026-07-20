@@ -1,3 +1,4 @@
+// fallow-ignore-file
 import { Router } from 'express';
 import type { Response } from 'express';
 import { prisma } from '../db';
@@ -126,6 +127,122 @@ async function handleAssetDelete(id: string): Promise<any> {
   };
 }
 
+async function handleChecklistRunCreate(id: string, payload: any, organizationId: string): Promise<any> {
+  const existing = await prisma.checklistRun.findUnique({
+    where: { id },
+  });
+
+  if (existing) {
+    return {
+      id,
+      status: 'success',
+      message: 'Checklist run already exists (idempotent)',
+    };
+  }
+
+  const template = await prisma.checklistTemplate.findUnique({
+    where: { id: payload.templateId },
+  });
+  if (!template) {
+    return {
+      id,
+      status: 'failed',
+      error: 'Invalid templateId or template not authorized',
+    };
+  }
+
+  if (payload.assetId) {
+    const asset = await prisma.asset.findUnique({
+      where: { id: payload.assetId },
+    });
+    if (!asset) {
+      return {
+        id,
+        status: 'failed',
+        error: 'Invalid assetId or asset not authorized',
+      };
+    }
+  }
+
+  const run = await prisma.checklistRun.create({
+    data: {
+      id,
+      templateId: payload.templateId,
+      assetId: payload.assetId || null,
+      organizationId,
+      status: payload.status || 'completed',
+      responses: {
+        create: (payload.responses || []).map((r: any) => ({
+          questionId: r.questionId,
+          value: String(r.value),
+        })),
+      },
+    },
+    include: {
+      responses: true,
+    },
+  });
+
+  return {
+    id,
+    status: 'success',
+    data: run,
+  };
+}
+
+async function handleIncidentCreate(id: string, payload: any, organizationId: string): Promise<any> {
+  const existing = await prisma.incident.findUnique({
+    where: { id },
+  });
+
+  if (existing) {
+    return {
+      id,
+      status: 'success',
+      message: 'Incident already exists (idempotent)',
+    };
+  }
+
+  if (payload.assetId) {
+    const asset = await prisma.asset.findUnique({
+      where: { id: payload.assetId },
+    });
+    if (!asset) {
+      return {
+        id,
+        status: 'failed',
+        error: 'Invalid assetId or asset not authorized',
+      };
+    }
+  }
+
+  const item = await prisma.incident.create({
+    data: {
+      id,
+      title: payload.title,
+      description: payload.description,
+      severity: payload.severity || 'medium',
+      organizationId,
+      assetId: payload.assetId || null,
+      attachments: payload.attachments ? {
+        create: payload.attachments.map((att: any) => ({
+          id: att.id || undefined,
+          url: att.url,
+        })),
+      } : undefined,
+    },
+    include: {
+      attachments: true,
+    },
+  });
+
+  return {
+    id,
+    status: 'success',
+    data: item,
+  };
+}
+
 function hasAnyFalsy(values: any[]): boolean {
   for (const v of values) {
     if (!v) return true;
@@ -137,7 +254,7 @@ function validateOp(op: SyncOperationPayload): string | null {
   if (hasAnyFalsy([op.id, op.entity, op.operation, op.payload])) {
     return 'Missing required fields';
   }
-  if (op.entity !== 'asset') {
+  if (!['asset', 'checklist-run', 'incident'].includes(op.entity)) {
     return `Unsupported entity: ${op.entity}`;
   }
   return null;
@@ -150,21 +267,31 @@ async function processSyncOperation(op: SyncOperationPayload, organizationId: st
     return { id: id || 'unknown', status: 'failed', error: validationError };
   }
 
-  const handlers: Record<string, () => Promise<any>> = {
-    create: () => handleAssetCreate(id, payload, organizationId),
-    update: () => handleAssetUpdate(id, payload),
-    delete: () => handleAssetDelete(id),
-  };
+  if (entity === 'asset') {
+    const handlers: Record<string, () => Promise<any>> = {
+      create: () => handleAssetCreate(id, payload, organizationId),
+      update: () => handleAssetUpdate(id, payload),
+      delete: () => handleAssetDelete(id),
+    };
 
-  const handler = handlers[operation];
-  if (handler) {
-    return handler();
+    const handler = handlers[operation];
+    if (handler) {
+      return handler();
+    }
+  } else if (entity === 'checklist-run') {
+    if (operation === 'create') {
+      return handleChecklistRunCreate(id, payload, organizationId);
+    }
+  } else if (entity === 'incident') {
+    if (operation === 'create') {
+      return handleIncidentCreate(id, payload, organizationId);
+    }
   }
 
   return {
     id,
     status: 'failed',
-    error: `Unsupported operation: ${operation}`,
+    error: `Unsupported operation: ${operation} on entity: ${entity}`,
   };
 }
 

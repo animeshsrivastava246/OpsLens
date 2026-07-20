@@ -64,6 +64,22 @@ function useSync(
 ) {
   const [syncing, setSyncing] = useState<boolean>(false);
 
+  // Background media uploads worker
+  useEffect(() => {
+    let interval: any;
+    if (isOnline) {
+      const { flushMediaUploads } = require('../src/api');
+      flushMediaUploads().catch(console.warn);
+      
+      interval = setInterval(() => {
+        flushMediaUploads().catch(console.warn);
+      }, 10000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isOnline]);
+
   const handleSyncNow = async () => {
     if (!isOnline) {
       setError('Cannot sync while offline. Please connect first.');
@@ -72,6 +88,9 @@ function useSync(
     setSyncing(true);
     setError(null);
     try {
+      const { flushMediaUploads } = require('../src/api');
+      await flushMediaUploads();
+
       const mutations = await getPendingMutations();
       if (mutations.length > 0) {
         const response = await api.post('/sync/batch', { operations: mutations });
@@ -342,8 +361,13 @@ function QrActionSection({ session }: { session: UserSession | null }) {
   return (
     <View style={styles.actionRow}>
       <Link href="/scan" asChild>
-        <Pressable style={styles.scanActionButton}>
-          <Text style={styles.scanActionText}>📷 Scan Asset QR Code</Text>
+        <Pressable style={[styles.scanActionButton, { marginRight: 6 }]}>
+          <Text style={styles.scanActionText}>📷 Scan QR Code</Text>
+        </Pressable>
+      </Link>
+      <Link href="/incident/report" asChild>
+        <Pressable style={[styles.scanActionButton, { backgroundColor: '#ea580c', marginLeft: 6 }]}>
+          <Text style={styles.scanActionText}>⚠️ Report Incident</Text>
         </Pressable>
       </Link>
     </View>

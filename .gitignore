@@ -56,3 +56,5 @@ skills-lock.json
 **/fallow/
 **/fallow.toml
 
+# Media Uploads
+api/public/uploads/

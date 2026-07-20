@@ -40,6 +40,12 @@ export default function RootLayout() {
             title: 'Asset Registry Detail',
           }}
         />
+        <Stack.Screen
+          name="incident/report"
+          options={{
+            title: 'Report Incident',
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );

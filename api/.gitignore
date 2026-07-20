@@ -42,3 +42,5 @@ db_data/
 .fallow/
 .fallow.toml
 
+# Uploads
+public/uploads/
