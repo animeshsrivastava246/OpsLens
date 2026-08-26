@@ -7,6 +7,7 @@ import assetRouter from './routes/asset.routes';
 import syncRouter from './routes/sync.routes';
 import checklistRouter from './routes/checklist.routes';
 import incidentRouter from './routes/incident.routes';
+import actionItemRouter from './routes/action-item.routes';
 import { authMiddleware, requireRole } from './middleware/auth.middleware';
 import prisma from './db';
 
@@ -30,6 +31,7 @@ app.use('/', assetRouter);
 app.use('/', syncRouter);
 app.use('/', checklistRouter);
 app.use('/', incidentRouter);
+app.use('/', actionItemRouter);
 
 // Verification test route for tenant isolation
 app.get('/test/tenant-isolation', authMiddleware as any, async (req: any, res) => {

@@ -62,7 +62,7 @@ Req: [x] Write idempotent reconciliation endpoints.
 Pass: [x] App operates without network.
 Pass: [x] Queues flush upon reconnection.
 
-## Phase 2: Workflow Operations [IN PROGRESS]
+## Phase 2: Workflow Operations [COMPLETED]
 
 ### Stage 2.1: Checklist Engine [COMPLETED]
 Tech: JSON Schema, Prisma relations.
@@ -88,13 +88,13 @@ Req: [x] Implement background upload workers.
 Pass: [x] Media uploads succeed perfectly.
 Pass: [x] Failed uploads retry automatically.
 
-### Stage 2.4: Corrective Actions
+### Stage 2.4: Corrective Actions [COMPLETED]
 Tech: Status machines, API routing.
-Req: Auto-generate action item tasks.
-Req: Route incidents by severity.
-Req: Track item lifecycle status.
-Pass: Status transitions record safely.
-Pass: Users view assignments instantly.
+Req: [x] Auto-generate action item tasks.
+Req: [x] Route incidents by severity.
+Req: [x] Track item lifecycle status.
+Pass: [x] Status transitions record safely.
+Pass: [x] Users view assignments instantly.
 
 ## Phase 3: Enterprise Readiness
 

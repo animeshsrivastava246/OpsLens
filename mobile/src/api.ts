@@ -67,6 +67,18 @@ async function handleOfflineGet(path: string): Promise<any> {
   if (path.startsWith('/assets/')) {
     return getOfflineAsset(path.substring('/assets/'.length));
   }
+  if (path.startsWith('/action-items')) {
+    return [
+      {
+        id: 'offline-action-1',
+        title: 'Inspect Cooling Valve',
+        description: 'Verify pressure valve on Generator A',
+        status: 'open',
+        priority: 'high',
+        createdAt: new Date().toISOString(),
+      }
+    ];
+  }
   if (path === '/checklist-templates') {
     const cached = await getCachedChecklists();
     if (cached.length > 0) {
@@ -160,7 +172,28 @@ async function handleOfflineMutation(path: string, method: string, options: Requ
       await queueMutation(id, 'checklist-run', 'create', payload);
       return { id, status: 'completed', message: 'Checklist run queued offline' };
     }
+    if (path === '/action-items') {
+      const payload = getPayload(options.body);
+      const id = payload.id || generateUUID();
+      await queueMutation(id, 'action-item', 'create', payload);
+      return { id, ...payload, status: 'open', message: 'Action item queued offline' };
+    }
+    if (path.startsWith('/action-items/') && path.endsWith('/complete')) {
+      const parts = path.split('/');
+      const id = parts[2];
+      const payload = getPayload(options.body);
+      await queueMutation(id, 'action-item', 'update', { status: payload.status || 'resolved' });
+      return { id, status: 'resolved', message: 'Action item completion queued offline' };
+    }
     return handleOfflineCreate(options.body);
+  }
+  if (path.startsWith('/action-items/')) {
+    const id = path.substring('/action-items/'.length);
+    if (method === 'PATCH') {
+      const payload = getPayload(options.body);
+      await queueMutation(id, 'action-item', 'update', payload);
+      return { id, ...payload, message: 'Action item update queued offline' };
+    }
   }
   const id = path.substring('/assets/'.length);
   if (method === 'PATCH') {

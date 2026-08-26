@@ -243,6 +243,91 @@ async function handleIncidentCreate(id: string, payload: any, organizationId: st
   };
 }
 
+async function handleActionItemCreate(id: string, payload: any, organizationId: string): Promise<any> {
+  const existing = await prisma.actionItem.findUnique({
+    where: { id },
+  });
+
+  if (existing) {
+    return {
+      id,
+      status: 'success',
+      message: 'Action item already exists (idempotent)',
+    };
+  }
+
+  const item = await prisma.actionItem.create({
+    data: {
+      id,
+      title: payload.title,
+      description: payload.description || null,
+      status: payload.status || 'open',
+      priority: payload.priority || 'medium',
+      organizationId,
+      incidentId: payload.incidentId || null,
+      assigneeId: payload.assigneeId || null,
+      dueDate: payload.dueDate ? new Date(payload.dueDate) : null,
+    },
+    include: {
+      incident: true,
+      assignee: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  return {
+    id,
+    status: 'success',
+    data: item,
+  };
+}
+
+async function handleActionItemUpdate(id: string, payload: any): Promise<any> {
+  const existing = await prisma.actionItem.findUnique({
+    where: { id },
+  });
+
+  if (!existing) {
+    return {
+      id,
+      status: 'failed',
+      error: 'Action item not found for update',
+    };
+  }
+
+  const updateData: any = {};
+  if (payload.title !== undefined) updateData.title = payload.title;
+  if (payload.description !== undefined) updateData.description = payload.description;
+  if (payload.priority !== undefined) updateData.priority = payload.priority;
+  if (payload.assigneeId !== undefined) updateData.assigneeId = payload.assigneeId;
+  if (payload.dueDate !== undefined) updateData.dueDate = payload.dueDate ? new Date(payload.dueDate) : null;
+  if (payload.status !== undefined && payload.status !== existing.status) {
+    const { isValidStatusTransition } = require('./action-item.routes');
+    if (!isValidStatusTransition(existing.status, payload.status)) {
+      return {
+        id,
+        status: 'failed',
+        error: `Invalid status transition from '${existing.status}' to '${payload.status}'`,
+      };
+    }
+    updateData.status = payload.status;
+  }
+
+  const updated = await prisma.actionItem.update({
+    where: { id },
+    data: updateData,
+    include: {
+      incident: true,
+      assignee: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  return {
+    id,
+    status: 'success',
+    data: updated,
+  };
+}
+
 function hasAnyFalsy(values: any[]): boolean {
   for (const v of values) {
     if (!v) return true;
@@ -254,7 +339,7 @@ function validateOp(op: SyncOperationPayload): string | null {
   if (hasAnyFalsy([op.id, op.entity, op.operation, op.payload])) {
     return 'Missing required fields';
   }
-  if (!['asset', 'checklist-run', 'incident'].includes(op.entity)) {
+  if (!['asset', 'checklist-run', 'incident', 'action-item'].includes(op.entity)) {
     return `Unsupported entity: ${op.entity}`;
   }
   return null;
@@ -285,6 +370,13 @@ async function processSyncOperation(op: SyncOperationPayload, organizationId: st
   } else if (entity === 'incident') {
     if (operation === 'create') {
       return handleIncidentCreate(id, payload, organizationId);
+    }
+  } else if (entity === 'action-item') {
+    if (operation === 'create') {
+      return handleActionItemCreate(id, payload, organizationId);
+    }
+    if (operation === 'update') {
+      return handleActionItemUpdate(id, payload);
     }
   }
 
