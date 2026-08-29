@@ -17,6 +17,7 @@ model Organization {
   checklistAssignments ChecklistAssignment[]
   checklistRuns      ChecklistRun[]
   actionItems        ActionItem[]
+  notifications      Notification[]
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 }
@@ -56,6 +57,7 @@ model User {
   memberships  Membership[]
   actionItems  ActionItem[]
   comments     Comment[]
+  notifications Notification[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
@@ -208,10 +210,17 @@ model Attachment {
 }
 
 model Notification {
-  id        String   @id @default(uuid())
-  message   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String       @id @default(uuid())
+  title          String?
+  message        String
+  type           String       @default("escalation")
+  read           Boolean      @default(false)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
 
 model AuditLog {

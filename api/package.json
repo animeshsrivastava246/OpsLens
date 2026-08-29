@@ -14,6 +14,7 @@
     "test:sync-incident": "bun run src/test-sync-incident.ts",
     "test:actions": "bun run src/test-actions.ts",
     "test:sync-actions": "bun run src/test-sync-actions.ts",
+    "test:escalation": "bun run src/test-escalation.ts",
     "health": "bun x fallow health",
     "clean": "rm -rf node_modules && rm -rf bun.lock && bun install && bun x prisma generate"
   },
@@ -22,6 +23,7 @@
     "@types/bun": "latest",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/ioredis": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.9.2",
     "prisma": "^7.8.0",
@@ -34,10 +36,12 @@
     "@prisma/adapter-mariadb": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "bcryptjs": "^3.0.3",
+    "bullmq": "^6.3.2",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "helmet": "^8.2.0",
+    "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "mariadb": "^3.5.3"
   }

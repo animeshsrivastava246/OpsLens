@@ -67,7 +67,7 @@ export const prisma = basePrisma.$extends({
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
         const tenantId = getTenantId(tenantStorage.getStore());
-        const tenantModels = ['Site', 'Asset', 'ChecklistTemplate', 'ChecklistAssignment', 'ChecklistRun', 'Membership', 'Incident', 'ActionItem'];
+        const tenantModels = ['Site', 'Asset', 'ChecklistTemplate', 'ChecklistAssignment', 'ChecklistRun', 'Membership', 'Incident', 'ActionItem', 'Notification'];
 
         if (tenantId) {
           const a = args as any;
