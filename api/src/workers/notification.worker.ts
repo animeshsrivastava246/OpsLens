@@ -2,7 +2,7 @@ import { Worker } from 'bullmq';
 import { NOTIFICATION_QUEUE_NAME } from '../queues/notification.queue';
 import { redisOptions } from '../config/redis.config';
 
-export const notificationWorker = new Worker(
+const notificationWorker = new Worker(
   NOTIFICATION_QUEUE_NAME,
   async (job) => {
     const { notificationId, userId, organizationId, title, message, type } = job.data;

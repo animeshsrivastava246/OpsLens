@@ -3,7 +3,7 @@ import { redisOptions } from '../config/redis.config';
 
 export const SLA_QUEUE_NAME = 'sla-escalation-queue';
 
-export const slaQueue = new Queue(SLA_QUEUE_NAME, {
+const slaQueue = new Queue(SLA_QUEUE_NAME, {
   connection: redisOptions,
 });
 

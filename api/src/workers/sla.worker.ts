@@ -66,7 +66,7 @@ export async function processOverdueSlaScan(organizationId?: string): Promise<{ 
   return { overdueCount: overdueItems.length, notificationsSent };
 }
 
-export const slaWorker = new Worker(
+const slaWorker = new Worker(
   SLA_QUEUE_NAME,
   async (job) => {
     const { organizationId } = job.data || {};

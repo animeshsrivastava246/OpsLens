@@ -21,13 +21,3 @@ export interface Asset {
   site: { name: string; id?: string };
   assetType: { name: string; id?: string };
 }
-
-export interface ActionItem {
-  id: string;
-  title: string;
-  description?: string;
-  status: string;
-  priority: string;
-  dueDate?: string;
-  createdAt: string;
-}

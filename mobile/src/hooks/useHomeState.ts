@@ -7,10 +7,11 @@ import {
   markMutationSynced,
   markMutationFailed,
   clearSyncQueue,
+  clearMediaUploadQueue,
 } from '../db/localDb';
 import type { UserSession, Asset, Site, AssetType } from '../types';
 
-export function useAssetForm() {
+function useAssetForm() {
   const [newAssetName, setNewAssetName] = useState<string>('');
   const [selectedSiteId, setSelectedSiteId] = useState<string>('');
   const [selectedTypeId, setSelectedTypeId] = useState<string>('');
@@ -28,7 +29,7 @@ export function useAssetForm() {
   };
 }
 
-export async function processSyncResults(results: any[]) {
+async function processSyncResults(results: any[]) {
   for (const res of results) {
     if (res.status === 'success') {
       await markMutationSynced(res.id);
@@ -38,7 +39,7 @@ export async function processSyncResults(results: any[]) {
   }
 }
 
-export function useSync(
+function useSync(
   isOnline: boolean,
   setError: (err: string | null) => void,
   updateQueueCount: () => Promise<void>,
@@ -89,7 +90,7 @@ export function useSync(
   return { syncing, handleSyncNow };
 }
 
-export interface UseAuthProps {
+interface UseAuthProps {
   setLoading: (l: boolean) => void;
   setError: (e: string | null) => void;
   fetchAssets: () => Promise<void>;
@@ -101,7 +102,7 @@ export interface UseAuthProps {
   setQueueCount: (c: number) => void;
 }
 
-export function useAuth(props: UseAuthProps) {
+function useAuth(props: UseAuthProps) {
   const {
     setLoading,
     setError,
@@ -149,12 +150,13 @@ export function useAuth(props: UseAuthProps) {
     setAssetTypes([]);
     setQueueCount(0);
     clearSyncQueue().catch(console.error);
+    clearMediaUploadQueue().catch(console.error);
   };
 
   return { session, handleLogin, handleLogout };
 }
 
-export function useAssetsData(form: ReturnType<typeof useAssetForm>) {
+function useAssetsData(form: ReturnType<typeof useAssetForm>) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
@@ -203,13 +205,13 @@ export function useAssetsData(form: ReturnType<typeof useAssetForm>) {
   };
 }
 
-export function validateForm(name: string, siteId: string, typeId: string): string | null {
+function validateForm(name: string, siteId: string, typeId: string): string | null {
   if (!name.trim()) return 'Asset name is required';
   if (!siteId || !typeId) return 'Site and Asset Type are required';
   return null;
 }
 
-export function useAssetCreation(
+function useAssetCreation(
   form: ReturnType<typeof useAssetForm>,
   updateQueueCount: () => Promise<void>,
   fetchAssets: () => Promise<void>
@@ -238,7 +240,7 @@ export function useAssetCreation(
   return { handleCreateAsset };
 }
 
-export function useNetwork(data: { fetchAssets: () => void; fetchMetadata: () => void }) {
+function useNetwork(data: { fetchAssets: () => void; fetchMetadata: () => void }) {
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
   const toggleNetworkMode = (online: boolean) => {
@@ -253,7 +255,7 @@ export function useNetwork(data: { fetchAssets: () => void; fetchMetadata: () =>
   return { isOnline, toggleNetworkMode };
 }
 
-export function useBootstrap(
+function useBootstrap(
   auth: { handleLogin: (email: string, pass: string) => Promise<void> },
   updateQueueCount: () => Promise<void>
 ) {

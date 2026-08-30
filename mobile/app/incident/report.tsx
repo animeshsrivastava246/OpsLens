@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { getCachedAssets, queueMutation, getDb } from '../../src/db/localDb';
+import { getCachedAssets, queueMutation, queueMediaUpload, getDb } from '../../src/db/localDb';
 import { api } from '../../src/api';
 
 interface SimpleAsset {
@@ -138,10 +138,7 @@ export default function ReportIncidentScreen() {
       await db.withTransactionAsync(async () => {
         // A. Queue media upload if image exists
         if (imageUri && finalLocalUri) {
-          await db.runAsync(
-            'INSERT OR REPLACE INTO media_upload_queue (id, localUri, remoteUrl, status, retryCount) VALUES (?, ?, ?, ?, ?)',
-            [attachmentId, finalLocalUri, remoteUrl, 'pending', 0]
-          );
+          await queueMediaUpload(attachmentId, finalLocalUri, remoteUrl);
         }
 
         // B. Queue incident creation

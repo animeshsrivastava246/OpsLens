@@ -13,6 +13,9 @@ import './workers/sla.worker';
 import './workers/notification.worker';
 import { authMiddleware, requireRole } from './middleware/auth.middleware';
 import prisma from './db';
+export * from './utils/response.util';
+export { processOverdueSlaScan } from './workers/sla.worker';
+export { redisConnection } from './config/redis.config';
 
 const app = express();
 const port = process.env.PORT || 3000;

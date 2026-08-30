@@ -3,7 +3,7 @@ import { redisOptions } from '../config/redis.config';
 
 export const NOTIFICATION_QUEUE_NAME = 'notification-queue';
 
-export const notificationQueue = new Queue(NOTIFICATION_QUEUE_NAME, {
+const notificationQueue = new Queue(NOTIFICATION_QUEUE_NAME, {
   connection: redisOptions,
 });
 

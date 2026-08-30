@@ -5,6 +5,7 @@ import { api } from '../../src/api';
 import {
   saveDraftRun,
   saveDraftResponses,
+  getDraftRun,
   getDraftResponses,
   deleteDraftRun
 } from '../../src/db/localDb';
@@ -71,6 +72,7 @@ export default function ChecklistRunScreen() {
 
       if (resolvedRunId) {
         try {
+          await getDraftRun(resolvedRunId);
           savedResponses = await getDraftResponses(resolvedRunId);
         } catch (dbErr) {
           console.warn('Failed to read draft responses from SQLite:', dbErr);
