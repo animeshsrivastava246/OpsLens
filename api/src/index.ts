@@ -9,6 +9,7 @@ import checklistRouter from './routes/checklist.routes';
 import incidentRouter from './routes/incident.routes';
 import actionItemRouter from './routes/action-item.routes';
 import notificationRouter from './routes/notification.routes';
+import auditRouter from './routes/audit.routes';
 import './workers/sla.worker';
 import './workers/notification.worker';
 import { authMiddleware, requireRole } from './middleware/auth.middleware';
@@ -39,6 +40,7 @@ app.use('/', checklistRouter);
 app.use('/', incidentRouter);
 app.use('/', actionItemRouter);
 app.use('/', notificationRouter);
+app.use('/', auditRouter);
 
 // Verification test route for tenant isolation
 app.get('/test/tenant-isolation', authMiddleware as any, async (req: any, res) => {

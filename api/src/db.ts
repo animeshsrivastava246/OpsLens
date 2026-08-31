@@ -53,6 +53,46 @@ function applyWriteFilter(model: string, a: any, tenantId: string, tenantModels:
   }
 }
 
+function sanitize(obj: any): any {
+  if (!obj) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(sanitize);
+  }
+  if (typeof obj === 'object') {
+    const copy: any = { ...obj };
+    if ('passwordHash' in copy) {
+      copy.passwordHash = '[REDACTED]';
+    }
+    return copy;
+  }
+  return obj;
+}
+
+async function recordAuditLog(
+  action: string,
+  actorId: string,
+  entity: string,
+  entityId: string,
+  oldState: any = null,
+  newState: any = null
+) {
+  try {
+    return await basePrisma.auditLog.create({
+      data: {
+        action,
+        actorId: actorId || 'system',
+        entity,
+        entityId: String(entityId || 'unknown'),
+        oldState: oldState ? JSON.parse(JSON.stringify(sanitize(oldState))) : null,
+        newState: newState ? JSON.parse(JSON.stringify(sanitize(newState))) : null,
+      },
+    });
+  } catch (err: any) {
+    console.warn('[AuditPipeline] Failed to record audit log:', err.message);
+    return null;
+  }
+}
+
 const filterOps = new Set(['findFirst', 'findMany', 'findUnique', 'count', 'aggregate', 'groupBy', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany']);
 const writeOps = new Set(['create', 'createMany']);
 
@@ -61,12 +101,15 @@ function getTenantId(context: TenantContext | undefined): string | undefined {
   return context.organizationId;
 }
 
-// Create the tenant-aware Prisma extension
+const auditIgnoredModels = new Set(['AuditLog', 'SyncOperation']);
+
+// Create the tenant-aware and audit-intercepting Prisma extension
 export const prisma = basePrisma.$extends({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
-        const tenantId = getTenantId(tenantStorage.getStore());
+        const store = tenantStorage.getStore();
+        const tenantId = getTenantId(store);
         const tenantModels = ['Site', 'Asset', 'ChecklistTemplate', 'ChecklistAssignment', 'ChecklistRun', 'Membership', 'Incident', 'ActionItem', 'Notification'];
 
         if (tenantId) {
@@ -78,7 +121,64 @@ export const prisma = basePrisma.$extends({
           }
         }
 
-        return query(args);
+        const isMutation = writeOps.has(operation) || operation === 'update' || operation === 'updateMany' || operation === 'delete' || operation === 'deleteMany' || operation === 'upsert';
+
+        let oldRecord: any = null;
+        if (isMutation && !auditIgnoredModels.has(model)) {
+          const delegateName = model.charAt(0).toLowerCase() + model.slice(1);
+          if (operation === 'update' || operation === 'delete' || operation === 'upsert') {
+            try {
+              const delegate = (basePrisma as any)[delegateName];
+              if (delegate?.findFirst && (args as any)?.where) {
+                oldRecord = await delegate.findFirst({ where: (args as any).where });
+              }
+            } catch (_) {}
+          }
+        }
+
+        const result = await query(args);
+
+        if (isMutation && !auditIgnoredModels.has(model)) {
+          const actorId = store?.userId || 'system';
+          let actionType = operation.toUpperCase();
+          let entityId = (result as any)?.id || oldRecord?.id || (args as any)?.where?.id || (args as any)?.data?.id || 'batch';
+          let oldStateData = null;
+          let newStateData = null;
+
+          if (operation === 'create') {
+            oldStateData = null;
+            newStateData = result || (args as any)?.data;
+          } else if (operation === 'createMany') {
+            oldStateData = null;
+            newStateData = (args as any)?.data;
+          } else if (operation === 'update') {
+            oldStateData = oldRecord;
+            newStateData = result;
+          } else if (operation === 'updateMany') {
+            oldStateData = (args as any)?.where;
+            newStateData = (args as any)?.data;
+          } else if (operation === 'delete') {
+            oldStateData = oldRecord;
+            newStateData = null;
+          } else if (operation === 'deleteMany') {
+            oldStateData = (args as any)?.where;
+            newStateData = null;
+          } else if (operation === 'upsert') {
+            oldStateData = oldRecord;
+            newStateData = result;
+          }
+
+          recordAuditLog(
+            `${model.toUpperCase()}_${actionType}`,
+            actorId,
+            model,
+            String(entityId),
+            oldStateData,
+            newStateData
+          ).catch(() => {});
+        }
+
+        return result;
       },
     },
   },

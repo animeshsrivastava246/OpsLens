@@ -15,6 +15,7 @@
     "test:actions": "bun run src/test-actions.ts",
     "test:sync-actions": "bun run src/test-sync-actions.ts",
     "test:escalation": "bun run src/test-escalation.ts",
+    "test:audit": "bun run src/test-audit.ts",
     "health": "bun x fallow health",
     "clean": "rm -rf node_modules && rm -rf bun.lock && bun install && bun x prisma generate"
   },
