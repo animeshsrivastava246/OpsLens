@@ -34,6 +34,38 @@ function QrActionSection({ session }: { session: UserSession | null }) {
   );
 }
 
+function ComplianceMetricsCard({ compliance, session }: { compliance: any; session: UserSession | null }) {
+  if (!session || !compliance) return null;
+  return (
+    <View style={styles.complianceCard}>
+      <View style={styles.complianceHeader}>
+        <Text style={styles.complianceTitle}>📊 Enterprise Compliance</Text>
+        <View style={styles.scoreBadge}>
+          <Text style={styles.scoreBadgeText}>{compliance.overallComplianceScore}% Score</Text>
+        </View>
+      </View>
+      <View style={styles.metricsGrid}>
+        <View style={styles.metricItem}>
+          <Text style={styles.metricValue}>{compliance.inspections?.completed || 0}</Text>
+          <Text style={styles.metricLabel}>Inspections</Text>
+        </View>
+        <View style={styles.metricItem}>
+          <Text style={[styles.metricValue, { color: compliance.incidents?.critical > 0 ? '#ef4444' : '#22c55e' }]}>
+            {compliance.incidents?.total || 0}
+          </Text>
+          <Text style={styles.metricLabel}>Incidents</Text>
+        </View>
+        <View style={styles.metricItem}>
+          <Text style={[styles.metricValue, { color: '#38bdf8' }]}>
+            {compliance.correctiveActions?.slaComplianceRate || 100}%
+          </Text>
+          <Text style={styles.metricLabel}>SLA On-Time</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function ErrorSection({ error }: { error: string | null }) {
   if (!error) return null;
   return (
@@ -62,6 +94,11 @@ export default function HomeDashboard() {
         session={state.session}
         onLogin={state.handleLogin}
         onLogout={state.handleLogout}
+      />
+
+      <ComplianceMetricsCard
+        compliance={state.compliance}
+        session={state.session}
       />
 
       <QrActionSection session={state.session} />
@@ -530,6 +567,60 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 16,
     gap: 16,
+  },
+  complianceCard: {
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  complianceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  complianceTitle: {
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  scoreBadge: {
+    backgroundColor: '#065f46',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  scoreBadgeText: {
+    color: '#34d399',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  metricItem: {
+    flex: 1,
+    backgroundColor: '#1e293b',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#f8fafc',
+  },
+  metricLabel: {
+    fontSize: 10,
+    color: '#94a3b8',
+    marginTop: 2,
+    fontWeight: '500',
   },
   headerRow: {
     flexDirection: 'row',

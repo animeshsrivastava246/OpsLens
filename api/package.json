@@ -16,6 +16,7 @@
     "test:sync-actions": "bun run src/test-sync-actions.ts",
     "test:escalation": "bun run src/test-escalation.ts",
     "test:audit": "bun run src/test-audit.ts",
+    "test:reports": "bun run src/test-reports.ts",
     "health": "bun x fallow health",
     "clean": "rm -rf node_modules && rm -rf bun.lock && bun install && bun x prisma generate"
   },
@@ -36,6 +37,7 @@
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@types/pdfkit": "^0.17.6",
     "bcryptjs": "^3.0.3",
     "bullmq": "^6.3.2",
     "cors": "^2.8.6",
@@ -44,6 +46,7 @@
     "helmet": "^8.2.0",
     "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
-    "mariadb": "^3.5.3"
+    "mariadb": "^3.5.3",
+    "pdfkit": "^0.20.2"
   }
 }

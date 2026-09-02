@@ -160,6 +160,7 @@ function useAssetsData(form: ReturnType<typeof useAssetForm>) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
+  const [compliance, setCompliance] = useState<any | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -169,11 +170,19 @@ function useAssetsData(form: ReturnType<typeof useAssetForm>) {
     try {
       const data = await api.get('/assets');
       setAssets(data);
+      fetchCompliance().catch(() => {});
     } catch (err: any) {
       setError(`Fetch assets failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchCompliance = async () => {
+    try {
+      const summary = await api.get('/reports/compliance-summary');
+      setCompliance(summary);
+    } catch (_) {}
   };
 
   const fetchMetadata = async () => {
@@ -184,6 +193,7 @@ function useAssetsData(form: ReturnType<typeof useAssetForm>) {
       setAssetTypes(typesData);
       if (sitesData.length > 0) form.setSelectedSiteId(sitesData[0].id);
       if (typesData.length > 0) form.setSelectedTypeId(typesData[0].id);
+      await fetchCompliance();
     } catch (err: any) {
       console.warn('Metadata fetch failed (probably offline):', err.message);
     }
@@ -196,12 +206,14 @@ function useAssetsData(form: ReturnType<typeof useAssetForm>) {
     setSites,
     assetTypes,
     setAssetTypes,
+    compliance,
     loading,
     setLoading,
     error,
     setError,
     fetchAssets,
     fetchMetadata,
+    fetchCompliance,
   };
 }
 
@@ -314,6 +326,7 @@ export function useHomeState() {
     assets: data.assets,
     assetTypes: data.assetTypes,
     sites: data.sites,
+    compliance: data.compliance,
     loading: data.loading,
     syncing,
     error: data.error,
