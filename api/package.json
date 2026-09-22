@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "dev": "bun --watch src/index.ts",
     "start": "bun --watch src/index.ts",
     "test:auth": "bun run src/test-auth.ts",
     "test:registry": "bun run src/test-registry.ts",
