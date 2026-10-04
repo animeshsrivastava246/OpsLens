@@ -1,68 +1,102 @@
 # OpsLens Mobile Application
 
-The OpsLens Mobile application is an offline-first client built on the React Native framework using the Expo SDK 56 bare workflow. Designed for high performance and reliable operations on mid-range and enterprise-grade devices, it uses Hermes v1 for Javascript compilation and execution.
+The OpsLens Mobile application is an offline-first client built on React Native and the Expo SDK 56 bare workflow. Designed for high performance and low-latency interactions on mid-range and enterprise-grade devices, it uses Hermes v1 for JavaScript compilation and execution.
 
-## Technical Architecture
+---
 
-### Component Stack
-*   **Framework**: Expo SDK 56 (Bare Workflow)
-*   **Runtime**: React Native 0.85, React 19.2
-*   **Engine**: Hermes v1
+## Technical Stack
+
+*   **Framework**: Expo SDK 56 (Bare Workflow) with Expo Router
+*   **Runtime**: React Native 0.85.3, React 19.2.3
+*   **Engine**: Hermes v1 (Bytecode compilation)
 *   **Language**: TypeScript 6.0.3
+*   **Storage**: SQLite (`expo-sqlite 56.0.5`) with local schema and offline mutation queue
+*   **Camera & Scanning**: `expo-camera 56.0.8` for QR code and barcode scanning
+*   **Filesystem & Media**: `expo-file-system 57.0.1` and `expo-image-picker 57.0.5`
 
-### Offline-First Persistence & Sync Strategy
-The mobile application is designed to function in areas of low or zero network connectivity:
+---
 
-*   **SQLite Storage**: Form templates, local asset registries, checklists, action items, and pending submissions are serialized and persisted locally using `expo-sqlite`.
-*   **Transactional Sync Queue**: Mutations made offline are stored as discrete operations in a local SQLite transaction log. Upon network re-connection, the app processes this queue sequentially using idempotent API endpoints to prevent duplicate records.
-*   **Media and Evidence Handling**: Photos, audio comments, and digital signatures are captured and cached in the local device filesystem via `expo-file-system`. Background upload tasks transfer these files asynchronously to S3-compatible cloud storage, utilizing chunked or resumable protocols to survive network dropouts.
-
-## Directory Structure
+## Architecture & Navigation Structure
 
 ```
 mobile/
-├── .expo/                # Local Expo cache and compilation artifacts
-├── android/              # Native Android project directory (bare workflow)
-├── ios/                  # Native iOS project directory (bare workflow)
-├── assets/               # Branding resources, app icons, and splash screens
-├── App.tsx               # Main application entry point
-├── app.json              # Expo application manifest configuration
-└── package.json          # Dependency manifest and run scripts
+├── app/                          # Expo Router Navigation Tree
+│   ├── _layout.tsx               # Root navigation stack configuration
+│   ├── index.tsx                 # Dashboard: Compliance metrics, assets & quick actions
+│   ├── scan.tsx                  # QR & barcode scanner with manual code input
+│   ├── asset/
+│   │   └── [id].tsx              # Asset details, inspection history & open issues
+│   ├── checklist/
+│   │   └── run.tsx               # Dynamic JSON Schema checklist execution engine
+│   └── incident/
+│       └── report.tsx            # Incident capture with severity and photo attachments
+├── src/
+│   ├── api.ts                    # HTTP client with offline queue interceptor
+│   ├── db/
+│   │   ├── localDb.ts            # Local SQLite schema, caching and sync queue
+│   │   └── localDb.test.ts       # Local database & queuing test suite
+│   ├── hooks/
+│   │   └── useHomeState.ts       # Unified dashboard state management hook
+│   └── types/
+│       └── index.ts              # Frontend data models and interfaces
+├── android/                      # Native Android project directory (bare workflow)
+├── ios/                          # Native iOS project directory (bare workflow)
+├── assets/                       # Branding resources and app icons
+├── app.json                      # Expo application manifest
+└── package.json                  # Dependencies and run scripts
 ```
+
+---
+
+## Offline-First Capabilities
+
+1.  **Local SQLite Cache**:
+    *   Assets, checklist templates, assignments, draft runs, action items, and incidents are stored locally in SQLite (`expo-sqlite`).
+    *   Enables full app navigation and execution with zero network connectivity.
+
+2.  **Idempotent Mutation Queue (`sync_queue`)**:
+    *   Offline mutations (inspections, incidents, actions) are stored in an append-only transaction log.
+    *   Client entities use RFC 4122 UUIDs to avoid sequence conflicts.
+    *   When connectivity is restored, mutations are flushed to `POST /sync/batch`.
+
+3.  **Dynamic Checklist Execution**:
+    *   Inspects incoming JSON Schemas and renders form elements dynamically.
+    *   Auto-saves responses locally as drafts to avoid losing progress.
+
+4.  **Local Media Pipeline**:
+    *   Images are saved locally via `expo-file-system`.
+    *   Background upload worker posts raw binary streams to `POST /media/upload`.
+
+---
 
 ## Running the Application
 
 ### Prerequisites
 *   Node.js 24.16.0 LTS
-*   Bun 1.1.x
-*   CocoaPods (for iOS compilation)
-*   Android Studio and SDK (for Android compilation)
+*   Bun 1.1+
+*   Android Studio & SDK (for Android) or Xcode & CocoaPods (for iOS)
 
 ### 1. Install Dependencies
 ```bash
 bun install
 ```
 
-### 2. Configure Native Projects
-Initialize the native project configurations and build artifacts:
+### 2. Prebuild Native Projects (If Needed)
 ```bash
 bun x expo prebuild
 ```
 
-### 3. Start Development Server
-Launch the Expo Metro packager:
+### 3. Launch Development Server
 ```bash
 bun run start
 ```
 
-### 4. Execute on Simulators or Physical Devices
+### 4. Target Platforms
+*   **Web Preview**: `bun run web` (or press `w` in Metro CLI)
+*   **Android Emulator / Device**: `bun run android` (or press `a` in Metro CLI)
+*   **iOS Simulator / Device**: `bun run ios` (or press `i` in Metro CLI)
 
-#### iOS Simulator / Device
+### 5. Code Quality Check
 ```bash
-bun run ios
-```
-
-#### Android Emulator / Device
-```bash
-bun run android
+bun run health
 ```
