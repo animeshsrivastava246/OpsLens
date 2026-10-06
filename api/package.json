@@ -5,7 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "start": "bun --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun run test:auth && bun run test:registry && bun run test:sync && bun run test:checklists && bun run test:sync-checklist && bun run test:incidents && bun run test:sync-incident && bun run test:actions && bun run test:sync-actions && bun run test:escalation && bun run test:audit && bun run test:reports",
     "test:auth": "bun run src/test-auth.ts",
     "test:registry": "bun run src/test-registry.ts",
     "test:sync": "bun run src/test-sync.ts",

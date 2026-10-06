@@ -32,6 +32,7 @@ db_data/
 .env
 .env.local
 .env.*
+!.env.example
 api/.env
 api/.env.local
 mobile/.env

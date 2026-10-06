@@ -30,6 +30,9 @@ if (typeof window === 'undefined') {
 // Resolve backend URL based on execution environment
 // Android emulator uses 10.0.2.2, iOS/Web use localhost
 const getBaseUrl = () => {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
   if (isAndroid) {
     return 'http://10.0.2.2:3000';
   }

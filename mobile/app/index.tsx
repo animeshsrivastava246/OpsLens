@@ -34,8 +34,24 @@ function QrActionSection({ session }: { session: UserSession | null }) {
   );
 }
 
+function MetricItem({ value, label, color }: { value: string | number; label: string; color?: string }) {
+  return (
+    <View style={styles.metricItem}>
+      <Text style={[styles.metricValue, color ? { color } : undefined]}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+}
+
+// fallow-ignore-next-line complexity
 function ComplianceMetricsCard({ compliance, session }: { compliance: any; session: UserSession | null }) {
   if (!session || !compliance) return null;
+  const inspections = compliance.inspections?.completed ?? 0;
+  const critical = compliance.incidents?.critical ?? 0;
+  const incidents = compliance.incidents?.total ?? 0;
+  const incidentColor = critical > 0 ? '#ef4444' : '#22c55e';
+  const slaRate = compliance.correctiveActions?.slaComplianceRate ?? 100;
+
   return (
     <View style={styles.complianceCard}>
       <View style={styles.complianceHeader}>
@@ -45,22 +61,9 @@ function ComplianceMetricsCard({ compliance, session }: { compliance: any; sessi
         </View>
       </View>
       <View style={styles.metricsGrid}>
-        <View style={styles.metricItem}>
-          <Text style={styles.metricValue}>{compliance.inspections?.completed || 0}</Text>
-          <Text style={styles.metricLabel}>Inspections</Text>
-        </View>
-        <View style={styles.metricItem}>
-          <Text style={[styles.metricValue, { color: compliance.incidents?.critical > 0 ? '#ef4444' : '#22c55e' }]}>
-            {compliance.incidents?.total || 0}
-          </Text>
-          <Text style={styles.metricLabel}>Incidents</Text>
-        </View>
-        <View style={styles.metricItem}>
-          <Text style={[styles.metricValue, { color: '#38bdf8' }]}>
-            {compliance.correctiveActions?.slaComplianceRate || 100}%
-          </Text>
-          <Text style={styles.metricLabel}>SLA On-Time</Text>
-        </View>
+        <MetricItem value={inspections} label="Inspections" />
+        <MetricItem value={incidents} label="Incidents" color={incidentColor} />
+        <MetricItem value={`${slaRate}%`} label="SLA On-Time" color="#38bdf8" />
       </View>
     </View>
   );
